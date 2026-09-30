@@ -8,6 +8,7 @@ import {
   addProjectMember,
   removeProjectMember
 } from "../controllers/project.controller.js";
+import { getProjectActivityLogs } from "../controllers/activity.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -22,5 +23,8 @@ router.route("/:projectId").get(getProjectById).put(updateProject).delete(delete
 // Project member management routes
 router.post("/:projectId/members", addProjectMember);
 router.delete("/:projectId/members/:userId", removeProjectMember);
+
+// Activity logs route
+router.get("/:projectId/activity", getProjectActivityLogs);
 
 export default router;

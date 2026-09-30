@@ -3,6 +3,7 @@ import Task from "../models/task.model.js";
 import Project from "../models/project.model.js";
 import Workspace from "../models/workspace.model.js";
 import User from "../models/user.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 
 // @desc    Create a new task
 // @route   POST /api/v1/tasks
@@ -156,6 +157,25 @@ export const createTask = async (req, res, next) => {
       priority: taskPriority,
       dueDate: dueDate ? new Date(dueDate) : null
     });
+
+    // Log task creation activity
+    await ActivityLog.create({
+      user: req.user._id,
+      project: targetProjectId,
+      task: task._id,
+      action: "TASK_CREATED",
+      description: `${req.user.name || "User"} created task "${task.title}"`
+    });
+
+    if (assignedUserId) {
+      await ActivityLog.create({
+        user: req.user._id,
+        project: targetProjectId,
+        task: task._id,
+        action: "TASK_ASSIGNED",
+        description: `${req.user.name || "User"} assigned task "${task.title}"`
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -328,6 +348,8 @@ export const updateTask = async (req, res, next) => {
       assignedTo
     } = req.body || {};
 
+    let generalUpdated = false;
+
     // Allow updating: title
     if (title !== undefined) {
       if (!title || !title.trim()) {
@@ -337,11 +359,13 @@ export const updateTask = async (req, res, next) => {
         });
       }
       task.title = title.trim();
+      generalUpdated = true;
     }
 
     // Allow updating: description
     if (description !== undefined) {
       task.description = description.trim();
+      generalUpdated = true;
     }
 
     // Allow updating: status
@@ -364,11 +388,13 @@ export const updateTask = async (req, res, next) => {
         });
       }
       task.priority = priority;
+      generalUpdated = true;
     }
 
     // Allow updating: dueDate
     if (dueDate !== undefined) {
       task.dueDate = dueDate ? new Date(dueDate) : null;
+      generalUpdated = true;
     }
 
     // Allow updating: assignedTo (must be a member of the project)
@@ -412,6 +438,41 @@ export const updateTask = async (req, res, next) => {
     await task.populate("workspace", "name");
     await task.populate("assignedTo", "name email avatar");
     await task.populate("createdBy", "name email avatar");
+
+    const taskProjectId = task.project._id || task.project;
+
+    // Log activity: Task Assigned
+    if (assignedTo !== undefined) {
+      await ActivityLog.create({
+        user: req.user._id,
+        project: taskProjectId,
+        task: task._id,
+        action: "TASK_ASSIGNED",
+        description: `${req.user.name || "User"} assigned task "${task.title}"`
+      });
+    }
+
+    // Log activity: Task Status Changed
+    if (status !== undefined) {
+      await ActivityLog.create({
+        user: req.user._id,
+        project: taskProjectId,
+        task: task._id,
+        action: "TASK_STATUS_CHANGED",
+        description: `${req.user.name || "User"} changed status of task "${task.title}" to ${task.status}`
+      });
+    }
+
+    // Log activity: Task Updated
+    if (generalUpdated || (status === undefined && assignedTo === undefined)) {
+      await ActivityLog.create({
+        user: req.user._id,
+        project: taskProjectId,
+        task: task._id,
+        action: "TASK_UPDATED",
+        description: `${req.user.name || "User"} updated task "${task.title}"`
+      });
+    }
 
     return res.status(200).json({
       success: true,

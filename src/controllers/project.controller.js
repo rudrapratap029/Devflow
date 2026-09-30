@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Project from "../models/project.model.js";
 import Workspace from "../models/workspace.model.js";
 import User from "../models/user.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 
 // @desc    Create a new project
 // @route   POST /api/v1/projects
@@ -74,6 +75,14 @@ export const createProject = async (req, res, next) => {
       owner: req.user._id,
       members: [req.user._id],
       status: projectStatus
+    });
+
+    // Log project creation activity
+    await ActivityLog.create({
+      user: req.user._id,
+      project: project._id,
+      action: "PROJECT_CREATED",
+      description: `${req.user.name || "User"} created project "${project.name}"`
     });
 
     return res.status(201).json({

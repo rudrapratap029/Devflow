@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Comment from "../models/comment.model.js";
 import Task from "../models/task.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 
 // @desc    Create a comment on a task
 // @route   POST /api/v1/tasks/:taskId/comments
@@ -65,6 +66,15 @@ export const createComment = async (req, res, next) => {
 
     // Populate user info for response
     await comment.populate("user", "name email avatar");
+
+    // Log comment creation activity
+    await ActivityLog.create({
+      user: req.user._id,
+      project: project._id,
+      task: taskId,
+      action: "COMMENT_CREATED",
+      description: `${req.user.name || "User"} added a comment on task "${task.title}"`
+    });
 
     return res.status(201).json({
       success: true,
@@ -215,8 +225,11 @@ export const deleteComment = async (req, res, next) => {
       });
     }
 
-    // Find comment
-    const comment = await Comment.findById(commentId);
+    // Find comment and populate task to obtain project reference
+    const comment = await Comment.findById(commentId).populate({
+      path: "task",
+      select: "title project"
+    });
     if (!comment) {
       return res.status(404).json({
         success: false,
@@ -232,8 +245,22 @@ export const deleteComment = async (req, res, next) => {
       });
     }
 
+    const projectId = comment.task?.project;
+    const taskId = comment.task?._id || comment.task;
+
     // Delete comment from database
     await Comment.findByIdAndDelete(commentId);
+
+    // Log comment deletion activity
+    if (projectId) {
+      await ActivityLog.create({
+        user: req.user._id,
+        project: projectId,
+        task: taskId,
+        action: "COMMENT_DELETED",
+        description: `${req.user.name || "User"} deleted a comment`
+      });
+    }
 
     return res.status(200).json({
       success: true,
