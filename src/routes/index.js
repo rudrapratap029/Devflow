@@ -4,6 +4,7 @@ import workspaceRoutes from "./workspace.routes.js";
 import projectRoutes from "./project.routes.js";
 import taskRoutes from "./task.routes.js";
 import commentRoutes from "./comment.routes.js";
+import dashboardRoutes from "./dashboard.routes.js";
 
 const router = Router();
 
@@ -30,5 +31,8 @@ router.use(commentRoutes);
 
 router.use("/task", taskRoutes);
 router.use("/tasks", taskRoutes);
+
+// Register Dashboard Routes
+router.use("/dashboard", dashboardRoutes);
 
 export default router;
