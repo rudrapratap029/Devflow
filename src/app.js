@@ -3,10 +3,16 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import apiRoutes from "./routes/index.js";
 import notFound from "./middleware/notFound.middleware.js";
 import errorHandler from "./middleware/error.middleware.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.resolve(__dirname, "../uploads");
 
 const app = express();
 
@@ -25,6 +31,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Cookie parser
 app.use(cookieParser());
+
+// Serve static uploads
+app.use("/uploads", express.static(uploadDir));
 
 // Health Check Route
 app.get("/", (req, res) => {

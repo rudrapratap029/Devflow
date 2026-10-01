@@ -4,6 +4,7 @@ import workspaceRoutes from "./workspace.routes.js";
 import projectRoutes from "./project.routes.js";
 import taskRoutes from "./task.routes.js";
 import commentRoutes from "./comment.routes.js";
+import attachmentRoutes from "./attachment.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 
 const router = Router();
@@ -28,6 +29,9 @@ router.use("/projects", projectRoutes);
 
 // Register Comment Routes
 router.use(commentRoutes);
+
+// Register Attachment Routes
+router.use(attachmentRoutes);
 
 router.use("/task", taskRoutes);
 router.use("/tasks", taskRoutes);

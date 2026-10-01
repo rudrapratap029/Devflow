@@ -217,7 +217,12 @@ export const getTasks = async (req, res, next) => {
           success: true,
           message: "Tasks fetched successfully",
           data: {
-            tasks: []
+            tasks: [],
+            pagination: {
+              currentPage: 1,
+              totalPages: 0,
+              totalTasks: 0
+            }
           }
         });
       }
@@ -233,18 +238,53 @@ export const getTasks = async (req, res, next) => {
       filter.priority = req.query.priority;
     }
 
+    // Optional filter: assignedTo
+    if (req.query.assignedTo) {
+      if (mongoose.Types.ObjectId.isValid(req.query.assignedTo)) {
+        filter.assignedTo = req.query.assignedTo;
+      } else {
+        // Non-matching assignedTo when invalid user ID is provided
+        filter.assignedTo = new mongoose.Types.ObjectId();
+      }
+    }
+
+    // Optional search: title or description
+    if (req.query.search && req.query.search.trim()) {
+      const escapedSearch = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escapedSearch, "i");
+      filter.$or = [
+        { title: searchRegex },
+        { description: searchRegex }
+      ];
+    }
+
+    // Pagination
+    const page = parseInt(req.query.page, 10) > 0 ? parseInt(req.query.page, 10) : 1;
+    const limit = parseInt(req.query.limit, 10) > 0 ? parseInt(req.query.limit, 10) : 10;
+    const skip = (page - 1) * limit;
+
+    const totalTasks = await Task.countDocuments(filter);
+    const totalPages = Math.ceil(totalTasks / limit);
+
     const tasks = await Task.find(filter)
       .populate("project", "name")
       .populate("workspace", "name")
       .populate("assignedTo", "name email avatar")
       .populate("createdBy", "name email avatar")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     return res.status(200).json({
       success: true,
       message: "Tasks fetched successfully",
       data: {
-        tasks
+        tasks,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalTasks
+        }
       }
     });
   } catch (error) {

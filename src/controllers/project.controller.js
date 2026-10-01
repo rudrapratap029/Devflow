@@ -111,17 +111,42 @@ export const getProjects = async (req, res, next) => {
       filter.workspace = workspaceFilter;
     }
 
+    // Optional search: name or description
+    if (req.query.search && req.query.search.trim()) {
+      const escapedSearch = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escapedSearch, "i");
+      filter.$or = [
+        { name: searchRegex },
+        { description: searchRegex }
+      ];
+    }
+
+    // Pagination
+    const page = parseInt(req.query.page, 10) > 0 ? parseInt(req.query.page, 10) : 1;
+    const limit = parseInt(req.query.limit, 10) > 0 ? parseInt(req.query.limit, 10) : 10;
+    const skip = (page - 1) * limit;
+
+    const totalProjects = await Project.countDocuments(filter);
+    const totalPages = Math.ceil(totalProjects / limit);
+
     const projects = await Project.find(filter)
       .populate("workspace", "name")
       .populate("owner", "name email avatar")
       .populate("members", "name email avatar")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     return res.status(200).json({
       success: true,
       message: "Projects fetched successfully",
       data: {
-        projects
+        projects,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalProjects
+        }
       }
     });
   } catch (error) {
