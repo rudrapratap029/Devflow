@@ -6,6 +6,7 @@ import taskRoutes from "./task.routes.js";
 import commentRoutes from "./comment.routes.js";
 import attachmentRoutes from "./attachment.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
+import notificationRoutes from "./notification.routes.js";
 
 const router = Router();
 
@@ -38,5 +39,9 @@ router.use("/tasks", taskRoutes);
 
 // Register Dashboard Routes
 router.use("/dashboard", dashboardRoutes);
+
+// Register Notification Routes
+router.use("/notifications", notificationRoutes);
+router.use("/notification", notificationRoutes);
 
 export default router;

@@ -4,6 +4,7 @@ import Project from "../models/project.model.js";
 import Workspace from "../models/workspace.model.js";
 import User from "../models/user.model.js";
 import ActivityLog from "../models/activityLog.model.js";
+import Notification from "../models/notification.model.js";
 
 // @desc    Create a new task
 // @route   POST /api/v1/tasks
@@ -175,6 +176,17 @@ export const createTask = async (req, res, next) => {
         action: "TASK_ASSIGNED",
         description: `${req.user.name || "User"} assigned task "${task.title}"`
       });
+
+      // Create notification for assigned user (if not self-assigned)
+      if (assignedUserId.toString() !== req.user._id.toString()) {
+        await Notification.create({
+          recipient: assignedUserId,
+          sender: req.user._id,
+          type: "TASK_ASSIGNED",
+          message: `${req.user.name || "User"} assigned you a new task: ${task.title}`,
+          task: task._id
+        });
+      }
     }
 
     return res.status(201).json({
@@ -368,6 +380,9 @@ export const updateTask = async (req, res, next) => {
       });
     }
 
+    const previousStatus = task.status;
+    const previousAssignedTo = task.assignedTo ? task.assignedTo.toString() : null;
+
     // Authorization: only task creator or project owner can update
     const isCreator = task.createdBy.toString() === req.user._id.toString();
     const isProjectOwner = task.project.owner.toString() === req.user._id.toString();
@@ -490,9 +505,30 @@ export const updateTask = async (req, res, next) => {
         action: "TASK_ASSIGNED",
         description: `${req.user.name || "User"} assigned task "${task.title}"`
       });
+
+      // Notify newly assigned user
+      const assignedUserId = task.assignedTo?._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo
+        ? task.assignedTo.toString()
+        : null;
+
+      if (
+        assignedUserId &&
+        assignedUserId !== previousAssignedTo &&
+        assignedUserId !== req.user._id.toString()
+      ) {
+        await Notification.create({
+          recipient: assignedUserId,
+          sender: req.user._id,
+          type: "TASK_ASSIGNED",
+          message: `${req.user.name || "User"} assigned you a new task: ${task.title}`,
+          task: task._id
+        });
+      }
     }
 
-    // Log activity: Task Status Changed
+    // Log activity & Create Notification: Task Status Changed
     if (status !== undefined) {
       await ActivityLog.create({
         user: req.user._id,
@@ -501,6 +537,36 @@ export const updateTask = async (req, res, next) => {
         action: "TASK_STATUS_CHANGED",
         description: `${req.user.name || "User"} changed status of task "${task.title}" to ${task.status}`
       });
+
+      // Notify task creator and assigned user (if exists)
+      const recipientsToNotify = new Set();
+      const creatorId = task.createdBy?._id
+        ? task.createdBy._id.toString()
+        : task.createdBy
+        ? task.createdBy.toString()
+        : null;
+      const assigneeId = task.assignedTo?._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo
+        ? task.assignedTo.toString()
+        : null;
+
+      if (creatorId) {
+        recipientsToNotify.add(creatorId);
+      }
+      if (assigneeId) {
+        recipientsToNotify.add(assigneeId);
+      }
+
+      for (const recipientId of recipientsToNotify) {
+        await Notification.create({
+          recipient: recipientId,
+          sender: req.user._id,
+          type: "TASK_STATUS_CHANGED",
+          message: `Task ${task.title} status changed to ${task.status}`,
+          task: task._id
+        });
+      }
     }
 
     // Log activity: Task Updated

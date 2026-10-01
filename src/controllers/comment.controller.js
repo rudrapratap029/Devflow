@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Comment from "../models/comment.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
+import Notification from "../models/notification.model.js";
 
 // @desc    Create a comment on a task
 // @route   POST /api/v1/tasks/:taskId/comments
@@ -75,6 +76,36 @@ export const createComment = async (req, res, next) => {
       action: "COMMENT_CREATED",
       description: `${req.user.name || "User"} added a comment on task "${task.title}"`
     });
+
+    // Notify task creator and assigned user (excluding commenter)
+    const recipientsToNotify = new Set();
+    const creatorId = task.createdBy?._id
+      ? task.createdBy._id.toString()
+      : task.createdBy
+      ? task.createdBy.toString()
+      : null;
+    const assigneeId = task.assignedTo?._id
+      ? task.assignedTo._id.toString()
+      : task.assignedTo
+      ? task.assignedTo.toString()
+      : null;
+
+    if (creatorId && creatorId !== req.user._id.toString()) {
+      recipientsToNotify.add(creatorId);
+    }
+    if (assigneeId && assigneeId !== req.user._id.toString()) {
+      recipientsToNotify.add(assigneeId);
+    }
+
+    for (const recipientId of recipientsToNotify) {
+      await Notification.create({
+        recipient: recipientId,
+        sender: req.user._id,
+        type: "COMMENT_ADDED",
+        message: `${req.user.name || "User"} commented on task: ${task.title}`,
+        task: task._id
+      });
+    }
 
     return res.status(201).json({
       success: true,
