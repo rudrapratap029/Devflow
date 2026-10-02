@@ -3,6 +3,7 @@ import Comment from "../models/comment.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 import Notification from "../models/notification.model.js";
+import { emitNotification } from "../sockets/socket.js";
 
 // @desc    Create a comment on a task
 // @route   POST /api/v1/tasks/:taskId/comments
@@ -98,13 +99,14 @@ export const createComment = async (req, res, next) => {
     }
 
     for (const recipientId of recipientsToNotify) {
-      await Notification.create({
+      const notification = await Notification.create({
         recipient: recipientId,
         sender: req.user._id,
         type: "COMMENT_ADDED",
         message: `${req.user.name || "User"} commented on task: ${task.title}`,
         task: task._id
       });
+      emitNotification(recipientId, notification);
     }
 
     return res.status(201).json({

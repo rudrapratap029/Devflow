@@ -6,7 +6,7 @@ import {
   updateTask,
   deleteTask
 } from "../controllers/task.controller.js";
-import { protect } from "../middleware/auth.middleware.js";
+import { protect, authorize } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
@@ -14,7 +14,10 @@ const router = Router();
 router.use(protect);
 
 // Task CRUD routes
-router.route("/").post(createTask).get(getTasks);
-router.route("/:taskId").get(getTaskById).put(updateTask).delete(deleteTask);
+router.route("/").post(authorize("admin", "manager"), createTask).get(getTasks);
+router.route("/:taskId")
+  .get(getTaskById)
+  .put(updateTask)
+  .delete(authorize("admin", "manager"), deleteTask);
 
 export default router;

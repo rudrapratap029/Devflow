@@ -7,6 +7,7 @@ import commentRoutes from "./comment.routes.js";
 import attachmentRoutes from "./attachment.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import notificationRoutes from "./notification.routes.js";
+import userRoutes from "./user.routes.js";
 
 const router = Router();
 
@@ -27,6 +28,9 @@ router.use("/workspaces", workspaceRoutes);
 
 router.use("/project", projectRoutes);
 router.use("/projects", projectRoutes);
+
+router.use("/users", userRoutes);
+router.use("/user", userRoutes);
 
 // Register Comment Routes
 router.use(commentRoutes);

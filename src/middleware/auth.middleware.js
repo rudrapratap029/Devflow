@@ -79,9 +79,11 @@ export const authorize = (...roles) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: `Forbidden: Role '${req.user?.role || "guest"}' is not authorized to access this resource`
+        message: "You are not authorized to perform this action"
       });
     }
     next();
   };
 };
+
+export const authorizeRoles = authorize;

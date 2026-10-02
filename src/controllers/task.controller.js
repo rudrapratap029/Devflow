@@ -5,6 +5,7 @@ import Workspace from "../models/workspace.model.js";
 import User from "../models/user.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 import Notification from "../models/notification.model.js";
+import { emitNotification } from "../sockets/socket.js";
 
 // @desc    Create a new task
 // @route   POST /api/v1/tasks
@@ -179,13 +180,14 @@ export const createTask = async (req, res, next) => {
 
       // Create notification for assigned user (if not self-assigned)
       if (assignedUserId.toString() !== req.user._id.toString()) {
-        await Notification.create({
+        const notification = await Notification.create({
           recipient: assignedUserId,
           sender: req.user._id,
           type: "TASK_ASSIGNED",
           message: `${req.user.name || "User"} assigned you a new task: ${task.title}`,
           task: task._id
         });
+        emitNotification(assignedUserId, notification);
       }
     }
 
@@ -383,14 +385,17 @@ export const updateTask = async (req, res, next) => {
     const previousStatus = task.status;
     const previousAssignedTo = task.assignedTo ? task.assignedTo.toString() : null;
 
-    // Authorization: only task creator or project owner can update
+    // Role and ownership authorization
+    const isAdmin = req.user.role === "admin";
+    const isManager = req.user.role === "manager";
     const isCreator = task.createdBy.toString() === req.user._id.toString();
-    const isProjectOwner = task.project.owner.toString() === req.user._id.toString();
+    const isProjectOwner = task.project?.owner?.toString() === req.user._id.toString();
+    const isAssigned = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
 
-    if (!isCreator && !isProjectOwner) {
+    if (!isAdmin && !isManager && !isCreator && !isProjectOwner && !isAssigned) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only the task creator or project owner can update this task"
+        message: "You are not authorized to perform this action"
       });
     }
 
@@ -402,6 +407,24 @@ export const updateTask = async (req, res, next) => {
       dueDate,
       assignedTo
     } = req.body || {};
+
+    // Developers can only update status of their own assigned tasks
+    if (req.user.role === "developer" && !isAdmin && !isManager && !isProjectOwner && !isCreator) {
+      // Developer cannot reassign tasks to others
+      if (assignedTo !== undefined) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not authorized to perform this action"
+        });
+      }
+      // Developer cannot change title, description, priority, or due date
+      if (title !== undefined || description !== undefined || priority !== undefined || dueDate !== undefined) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not authorized to perform this action"
+        });
+      }
+    }
 
     let generalUpdated = false;
 
@@ -513,18 +536,15 @@ export const updateTask = async (req, res, next) => {
         ? task.assignedTo.toString()
         : null;
 
-      if (
-        assignedUserId &&
-        assignedUserId !== previousAssignedTo &&
-        assignedUserId !== req.user._id.toString()
-      ) {
-        await Notification.create({
+      if (assignedUserId && assignedUserId !== req.user._id.toString()) {
+        const notification = await Notification.create({
           recipient: assignedUserId,
           sender: req.user._id,
           type: "TASK_ASSIGNED",
           message: `${req.user.name || "User"} assigned you a new task: ${task.title}`,
           task: task._id
         });
+        emitNotification(assignedUserId, notification);
       }
     }
 
@@ -559,13 +579,14 @@ export const updateTask = async (req, res, next) => {
       }
 
       for (const recipientId of recipientsToNotify) {
-        await Notification.create({
+        const notification = await Notification.create({
           recipient: recipientId,
           sender: req.user._id,
           type: "TASK_STATUS_CHANGED",
           message: `Task ${task.title} status changed to ${task.status}`,
           task: task._id
         });
+        emitNotification(recipientId, notification);
       }
     }
 
@@ -616,14 +637,16 @@ export const deleteTask = async (req, res, next) => {
       });
     }
 
-    // Authorization: only task creator or project owner can delete
+    // Authorization: Admin, Manager, Project Owner, or Task Creator
+    const isAdmin = req.user.role === "admin";
+    const isManager = req.user.role === "manager";
     const isCreator = task.createdBy.toString() === req.user._id.toString();
-    const isProjectOwner = task.project.owner.toString() === req.user._id.toString();
+    const isProjectOwner = task.project?.owner?.toString() === req.user._id.toString();
 
-    if (!isCreator && !isProjectOwner) {
+    if (!isAdmin && !isManager && !isCreator && !isProjectOwner) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only the task creator or project owner can delete this task"
+        message: "You are not authorized to perform this action"
       });
     }
 

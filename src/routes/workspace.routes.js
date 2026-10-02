@@ -8,19 +8,22 @@ import {
   addMember,
   removeMember
 } from "../controllers/workspace.controller.js";
-import { protect } from "../middleware/auth.middleware.js";
+import { protect, authorize } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
 // Protect all workspace routes with authentication middleware
 router.use(protect);
 
-// Workspace CRUD routes
-router.route("/").post(createWorkspace).get(getWorkspaces);
-router.route("/:id").get(getWorkspaceById).put(updateWorkspace).delete(deleteWorkspace);
+// Workspace CRUD routes (Admin only for create, update, delete)
+router.route("/").post(authorize("admin"), createWorkspace).get(getWorkspaces);
+router.route("/:id")
+  .get(getWorkspaceById)
+  .put(authorize("admin"), updateWorkspace)
+  .delete(authorize("admin"), deleteWorkspace);
 
-// Member management routes
-router.post("/:id/members", addMember);
-router.delete("/:id/members/:userId", removeMember);
+// Member management routes (Admin only)
+router.post("/:id/members", authorize("admin"), addMember);
+router.delete("/:id/members/:userId", authorize("admin"), removeMember);
 
 export default router;
