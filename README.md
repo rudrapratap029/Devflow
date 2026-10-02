@@ -4,7 +4,7 @@ DevFlow is a full-stack, role-based project and task management platform designe
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 
 * **Role-Based Access Control (RBAC)**:
   * **Admin**: Complete workspace administration, user management, project creation/deletion, and resource oversight.
@@ -18,7 +18,7 @@ DevFlow is a full-stack, role-based project and task management platform designe
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Frontend
 * **Framework**: React 19 + Vite
@@ -85,7 +85,7 @@ DevFlow/
 
 ---
 
-## ⚙️ Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 * **Node.js**: v18 or higher (v20+ recommended)
@@ -184,7 +184,7 @@ The backend API is accessible at: `http://localhost:5000/api/v1`.
 
 ---
 
-## 🧪 Building & Verification
+##  Building & Verification
 
 ```bash
 # Run production build on frontend
@@ -196,7 +196,7 @@ npm run lint:frontend
 
 ---
 
-## 📜 License
+##  License
 
 This project is licensed under the MIT License.
 
