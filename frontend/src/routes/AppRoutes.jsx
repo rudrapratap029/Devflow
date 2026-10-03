@@ -15,6 +15,7 @@ import Layout from "../components/Layout";
 
 const AppRoutes = () => {
   return (
+    
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Home />} />
