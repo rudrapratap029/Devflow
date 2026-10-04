@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import API from "../services/api";
+import API, { getAvatarUrl } from "../services/api";
 import UserProfileModal from "../components/UserProfileModal";
 
 const TaskBoard = () => {
@@ -41,6 +41,10 @@ const TaskBoard = () => {
   });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [recommendedUsers, setRecommendedUsers] = useState([]);
 
   // Fetch all user projects on mount
   useEffect(() => {
@@ -130,6 +134,9 @@ const TaskBoard = () => {
   // Open Create Modal
   const openCreateModal = (defaultStatus = "Todo") => {
     setCreateError("");
+    setAiError("");
+    setAiSuggestion(null);
+    setRecommendedUsers([]);
     setFormData({
       title: "",
       description: "",
@@ -140,6 +147,54 @@ const TaskBoard = () => {
       assignedTo: ""
     });
     setShowModal(true);
+  };
+
+  // Generate task suggestion and recommend users with AI
+  const handleAiGenerate = async () => {
+    if (!formData.title || !formData.title.trim()) {
+      setAiError("Please enter a task title first to generate suggestions.");
+      return;
+    }
+
+    try {
+      setAiLoading(true);
+      setAiError("");
+
+      // 1. Fetch AI Task Suggestion
+      const suggestionRes = await API.post("/ai/task-suggestion", {
+        title: formData.title.trim(),
+        description: formData.description
+      });
+
+      const suggestionData = suggestionRes.data?.data || suggestionRes.data || {};
+      setAiSuggestion(suggestionData);
+
+      // Populate description if user hasn't filled it in yet
+      if (!formData.description || !formData.description.trim()) {
+        setFormData((prev) => ({
+          ...prev,
+          description: suggestionData.description || prev.description
+        }));
+      }
+
+      // 2. Fetch User Recommendations (for Admin/Manager decision-support)
+      if (currentUser?.role === "admin" || currentUser?.role === "manager") {
+        const targetProjectId = formData.project || selectedProjectId || (projects[0]?._id || "");
+        const recRes = await API.post("/ai/recommend-users", {
+          title: formData.title.trim(),
+          description: suggestionData.description || formData.description,
+          projectId: targetProjectId
+        });
+
+        const recUsers = recRes.data?.data || recRes.data?.recommendations || [];
+        setRecommendedUsers(Array.isArray(recUsers) ? recUsers : []);
+      }
+    } catch (err) {
+      console.error("AI Assistant error:", err);
+      setAiError(err.response?.data?.message || "Failed to generate AI suggestions");
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // Handle Create Task
@@ -511,8 +566,26 @@ const TaskBoard = () => {
       {/* Create Task Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Create New Task</h2>
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Create New Task</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModal(false);
+                  setAiError("");
+                  setAiSuggestion(null);
+                  setRecommendedUsers([]);
+                  if (assignToParam) {
+                    setSearchParams(selectedProjectId ? { project: selectedProjectId } : {});
+                  }
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1"
+                title="Close modal"
+              >
+                ✕
+              </button>
+            </div>
 
             {createError && (
               <div className="mb-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-sm">
@@ -522,9 +595,32 @@ const TaskBoard = () => {
 
             <form onSubmit={handleCreateTask} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Task Title *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Task Title *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAiGenerate}
+                    disabled={aiLoading || !formData.title.trim()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                    title="Generate description, criteria, subtasks, and user recommendations"
+                  >
+                    {aiLoading ? (
+                      <>
+                        <svg className="animate-spin h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>✨ Generate with AI</span>
+                      </>
+                    )}
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
@@ -532,10 +628,86 @@ const TaskBoard = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
-                  placeholder="e.g. Implement user login flow"
+                  placeholder="e.g. Build Login API or Create React Dashboard"
                   className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                 />
+                {aiError && (
+                  <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">{aiError}</p>
+                )}
               </div>
+
+              {/* AI Suggestion Breakdown Panel */}
+              {aiSuggestion && (
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-indigo-100 dark:border-indigo-950/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span className="text-indigo-600 dark:text-indigo-400">✨</span> AI Task Assistant
+                      </span>
+                      {aiSuggestion.estimatedTime && (
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-100/70 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-medium">
+                          Estimated Time: {aiSuggestion.estimatedTime}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        let fullDesc = aiSuggestion.description || "";
+                        if (aiSuggestion.acceptanceCriteria?.length) {
+                          fullDesc +=
+                            `\n\nAcceptance Criteria:\n` +
+                            aiSuggestion.acceptanceCriteria.map((c) => `✓ ${c}`).join("\n");
+                        }
+                        if (aiSuggestion.subtasks?.length) {
+                          fullDesc +=
+                            `\n\nSubtasks:\n` +
+                            aiSuggestion.subtasks.map((s) => `✓ ${s}`).join("\n");
+                        }
+                        setFormData({ ...formData, description: fullDesc });
+                      }}
+                      className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 underline underline-offset-2 cursor-pointer"
+                    >
+                      Apply All to Description
+                    </button>
+                  </div>
+
+                  {/* AI Acceptance Criteria & Subtasks in 2 compact columns */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {aiSuggestion.acceptanceCriteria && aiSuggestion.acceptanceCriteria.length > 0 && (
+                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-400 block mb-1">
+                          Acceptance Criteria:
+                        </span>
+                        <ul className="space-y-1 text-slate-700 dark:text-slate-300">
+                          {aiSuggestion.acceptanceCriteria.map((item, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5 text-[11px]">
+                              <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {aiSuggestion.subtasks && aiSuggestion.subtasks.length > 0 && (
+                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                        <span className="font-semibold text-indigo-700 dark:text-indigo-400 block mb-1">
+                          Subtasks:
+                        </span>
+                        <ul className="space-y-1 text-slate-700 dark:text-slate-300">
+                          {aiSuggestion.subtasks.map((task, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5 text-[11px]">
+                              <span className="text-indigo-500 font-bold shrink-0">✓</span>
+                              <span>{task}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -551,6 +723,123 @@ const TaskBoard = () => {
                   className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                 />
               </div>
+
+              {/* Recommended Team Members Panel */}
+              {recommendedUsers.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span>👥</span> Recommended Team Members
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Smart match by skills, bio & workload
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {recommendedUsers.map((rec) => {
+                      const isSelected = formData.assignedTo === (rec.userId || rec._id);
+                      const matchBadgeClass =
+                        rec.matchScore >= 90
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                          : rec.matchScore >= 75
+                          ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
+                          : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+
+                      return (
+                        <div
+                          key={rec.userId || rec._id}
+                          className={`p-2.5 rounded-lg border text-xs transition-all ${
+                            isSelected
+                              ? "bg-indigo-50/90 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20"
+                              : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-200 text-[10px] shrink-0 overflow-hidden">
+                                {rec.avatar ? (
+                                  <img
+                                    src={getAvatarUrl(rec.avatar)}
+                                    alt={rec.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  (rec.name || "U")[0].toUpperCase()
+                                )}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-slate-900 dark:text-white">
+                                  {rec.name}
+                                </span>
+                                <span className="text-slate-400 dark:text-slate-500 text-[10px] ml-1.5 capitalize">
+                                  ({rec.role || "developer"})
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${matchBadgeClass}`}
+                              >
+                                {rec.matchScore}% Match
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFormData({
+                                    ...formData,
+                                    assignedTo: rec.userId || rec._id
+                                  })
+                                }
+                                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? "bg-indigo-600 text-white shadow-2xs"
+                                    : "bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400"
+                                }`}
+                              >
+                                {isSelected ? "Selected ✓" : "Select User"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Skills */}
+                          {rec.skills && rec.skills.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {rec.skills.map((skill, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 text-[10px] font-medium"
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Bio */}
+                          {rec.bio && (
+                            <p className="mt-1 text-slate-600 dark:text-slate-400 text-[11px] italic">
+                              "{rec.bio}"
+                            </p>
+                          )}
+
+                          {/* Reason & Workload */}
+                          <div className="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="pr-2">
+                              <strong className="text-slate-700 dark:text-slate-300">Reason: </strong>
+                              {rec.reason}
+                            </span>
+                            <span className="shrink-0 font-medium">
+                              {rec.pendingTasks === 0 ? "0 active tasks" : `${rec.pendingTasks} active`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -733,6 +1022,9 @@ const TaskBoard = () => {
                   type="button"
                   onClick={() => {
                     setShowModal(false);
+                    setAiError("");
+                    setAiSuggestion(null);
+                    setRecommendedUsers([]);
                     if (assignToParam) {
                       setSearchParams(selectedProjectId ? { project: selectedProjectId } : {});
                     }

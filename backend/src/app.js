@@ -53,6 +53,7 @@ app.get("/", (req, res) => {
 
 // Mount API v1 Routes
 app.use("/api/v1", apiRoutes);
+app.use("/api", apiRoutes);
 
 // 404 Route Not Found Middleware
 app.use(notFound);

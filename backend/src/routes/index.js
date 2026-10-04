@@ -8,6 +8,7 @@ import attachmentRoutes from "./attachment.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import notificationRoutes from "./notification.routes.js";
 import userRoutes from "./user.routes.js";
+import aiRoutes from "./ai.routes.js";
 
 const router = Router();
 
@@ -47,5 +48,8 @@ router.use("/dashboard", dashboardRoutes);
 // Register Notification Routes
 router.use("/notifications", notificationRoutes);
 router.use("/notification", notificationRoutes);
+
+// Register AI Routes
+router.use("/ai", aiRoutes);
 
 export default router;
