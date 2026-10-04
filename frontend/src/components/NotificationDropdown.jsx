@@ -26,12 +26,12 @@ const NotificationDropdown = () => {
       {/* Bell Icon Button */}
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className="relative p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+        className="relative p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
         aria-label="Notifications"
       >
         <span className="text-base">🔔</span>
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow">
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -39,15 +39,15 @@ const NotificationDropdown = () => {
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl bg-slate-800 border border-slate-700 shadow-2xl z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl z-50 overflow-hidden">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <span className="font-semibold text-white text-sm">
+              <span className="font-semibold text-slate-900 dark:text-white text-sm">
                 Notifications
               </span>
               {unreadCount > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-medium">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-medium">
                   {unreadCount} new
                 </span>
               )}
@@ -55,7 +55,7 @@ const NotificationDropdown = () => {
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
               >
                 Mark all as read
               </button>
@@ -63,9 +63,9 @@ const NotificationDropdown = () => {
           </div>
 
           {/* List */}
-          <div className="max-h-80 overflow-y-auto divide-y divide-slate-700/60">
+          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/60">
             {notifications.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-400">
+              <div className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">
                 No notifications right now.
               </div>
             ) : (
@@ -73,8 +73,8 @@ const NotificationDropdown = () => {
                 <div
                   key={n._id}
                   onClick={() => !n.isRead && markAsRead(n._id)}
-                  className={`p-3.5 hover:bg-slate-700/50 transition-colors cursor-pointer flex items-start space-x-3 ${
-                    !n.isRead ? "bg-slate-700/20" : ""
+                  className={`p-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer flex items-start space-x-3 ${
+                    !n.isRead ? "bg-indigo-50/40 dark:bg-slate-700/30" : ""
                   }`}
                 >
                   <span className="text-base shrink-0 mt-0.5">
@@ -88,13 +88,13 @@ const NotificationDropdown = () => {
                     <p
                       className={`text-xs sm:text-sm leading-snug ${
                         !n.isRead
-                          ? "font-semibold text-white"
-                          : "text-slate-300"
+                          ? "font-semibold text-slate-900 dark:text-white"
+                          : "text-slate-600 dark:text-slate-300"
                       }`}
                     >
                       {n.message}
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-1">
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
                       {n.createdAt
                         ? new Date(n.createdAt).toLocaleDateString(undefined, {
                             month: "short",
@@ -106,7 +106,7 @@ const NotificationDropdown = () => {
                     </p>
                   </div>
                   {!n.isRead && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 mt-1.5" />
+                    <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0 mt-1.5" />
                   )}
                 </div>
               ))

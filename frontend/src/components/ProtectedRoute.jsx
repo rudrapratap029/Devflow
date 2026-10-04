@@ -7,10 +7,10 @@ const ProtectedRoute = ({ children }) => {
   // Show simple loading indicator while checking auth from localStorage
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-400">
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
-          <span>Loading...</span>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-slate-600 dark:text-slate-400">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-4 h-4 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin"></div>
+          <span className="text-xs font-medium">Loading...</span>
         </div>
       </div>
     );

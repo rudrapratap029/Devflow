@@ -69,6 +69,16 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  // Update user in state and localStorage
+  const updateUser = (updatedData) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const nextUser = { ...prev, ...updatedData };
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      return nextUser;
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -76,7 +86,8 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         loading,
         login,
-        logout
+        logout,
+        updateUser
       }}
     >
       {children}
