@@ -32,6 +32,16 @@ const projectSchema = new mongoose.Schema(
       type: String,
       enum: ["Active", "Completed"],
       default: "Active"
+    },
+    githubUrl: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    liveUrl: {
+      type: String,
+      trim: true,
+      default: ""
     }
   },
   {

@@ -5,7 +5,12 @@ const attachmentSchema = new mongoose.Schema(
     task: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Task",
-      required: [true, "Task reference is required"]
+      default: null
+    },
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      default: null
     },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,

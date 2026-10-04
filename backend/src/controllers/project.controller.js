@@ -9,7 +9,7 @@ import ActivityLog from "../models/activityLog.model.js";
 // @access  Private
 export const createProject = async (req, res, next) => {
   try {
-    const { name, description, workspace, workspaceId, status } = req.body || {};
+    const { name, description, workspace, workspaceId, status, githubUrl, liveUrl } = req.body || {};
     const targetWorkspaceId = workspace || workspaceId;
 
     // Validate required fields
@@ -74,7 +74,9 @@ export const createProject = async (req, res, next) => {
       workspace: targetWorkspaceId,
       owner: req.user._id,
       members: [req.user._id],
-      status: projectStatus
+      status: projectStatus,
+      githubUrl: githubUrl ? githubUrl.trim() : "",
+      liveUrl: liveUrl ? liveUrl.trim() : ""
     });
 
     // Log project creation activity
@@ -229,18 +231,31 @@ export const updateProject = async (req, res, next) => {
       });
     }
 
-    // Check if logged-in user is the project owner
-    if (project.owner.toString() !== req.user._id.toString()) {
+    // Check if logged-in user is project owner, admin, manager, or member
+    const isOwner = project.owner.toString() === req.user._id.toString();
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    const isManager = req.user.role?.toLowerCase() === "manager";
+    const isMember =
+      project.members &&
+      project.members.some((m) => m.toString() === req.user._id.toString());
+
+    if (!isOwner && !isAdmin && !isManager && !isMember) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only the project owner can update this project"
+        message: "Access denied. You do not have permission to update this project"
       });
     }
 
-    const { name, description, status } = req.body || {};
+    const { name, description, status, githubUrl, liveUrl } = req.body || {};
 
-    // Allow updating only name, description, and status
+    // Only owner, admin, or manager can rename or change the description of the project
     if (name !== undefined) {
+      if (!isOwner && !isAdmin && !isManager) {
+        return res.status(403).json({
+          success: false,
+          message: "Only the project owner, Manager, or Admin can rename this project"
+        });
+      }
       if (!name || !name.trim()) {
         return res.status(400).json({
           success: false,
@@ -251,6 +266,12 @@ export const updateProject = async (req, res, next) => {
     }
 
     if (description !== undefined) {
+      if (!isOwner && !isAdmin && !isManager) {
+        return res.status(403).json({
+          success: false,
+          message: "Only the project owner, Manager, or Admin can update project description"
+        });
+      }
       project.description = description.trim();
     }
 
@@ -262,6 +283,14 @@ export const updateProject = async (req, res, next) => {
         });
       }
       project.status = status;
+    }
+
+    if (githubUrl !== undefined) {
+      project.githubUrl = githubUrl ? githubUrl.trim() : "";
+    }
+
+    if (liveUrl !== undefined) {
+      project.liveUrl = liveUrl ? liveUrl.trim() : "";
     }
 
     await project.save();

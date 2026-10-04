@@ -348,6 +348,16 @@ const TaskBoard = () => {
             </select>
           </div>
 
+          {selectedProjectId && (
+            <Link
+              to={`/projects?project=${selectedProjectId}`}
+              className="px-3 py-2 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-300 dark:border-slate-700 shadow-xs flex items-center gap-1.5"
+              title="View and attach project resources, deliverables, and links"
+            >
+              <span>📁</span> Resources
+            </Link>
+          )}
+
           <button
             onClick={() => openCreateModal("Todo")}
             disabled={!selectedProjectId}
@@ -938,6 +948,21 @@ const TaskBoard = () => {
                               {selectedUser.isActive !== false ? "Available" : "Unavailable"}
                             </span>
                           </div>
+
+                          {/* Email */}
+                          {selectedUser.email && (
+                            <div>
+                              <span className="text-slate-500 dark:text-slate-400 font-medium">Email: </span>
+                              <a
+                                href={`mailto:${selectedUser.email}`}
+                                className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline transition-colors"
+                                title={`Send email to ${selectedUser.email}`}
+                              >
+                                <span>📧</span>
+                                <span>{selectedUser.email}</span>
+                              </a>
+                            </div>
+                          )}
 
                           {/* Bio */}
                           <div>

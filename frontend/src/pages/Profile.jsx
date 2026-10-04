@@ -372,7 +372,18 @@ const Profile = () => {
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
               {user?.name || "Developer"}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{user?.email || "No email"}</p>
+            {user?.email ? (
+              <a
+                href={`mailto:${user.email}`}
+                className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition-colors"
+                title={`Send email to ${user.email}`}
+              >
+                <span>📧</span>
+                <span>{user.email}</span>
+              </a>
+            ) : (
+              <p className="text-sm text-slate-500 dark:text-slate-400">No email</p>
+            )}
             <div className="pt-2">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                 {user?.role || "Developer"}

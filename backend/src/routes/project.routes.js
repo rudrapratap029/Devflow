@@ -20,7 +20,7 @@ router.use(protect);
 router.route("/").post(authorize("admin", "manager"), createProject).get(getProjects);
 router.route("/:projectId")
   .get(getProjectById)
-  .put(authorize("admin", "manager"), updateProject)
+  .put(updateProject)
   .delete(authorize("admin", "manager"), deleteProject);
 
 // Project member management routes (Admin and Manager only)

@@ -148,9 +148,21 @@ const UserProfileModal = ({ isOpen, onClose, userId, initialData = null }) => {
                       {roleDisplay}
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 truncate">
-                    {user.email || "No email"}
-                  </p>
+                  <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs sm:text-sm">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Email:</span>
+                    {user.email ? (
+                      <a
+                        href={`mailto:${user.email}`}
+                        className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline transition-colors truncate font-medium"
+                        title={`Send email to ${user.email}`}
+                      >
+                        <span>📧</span>
+                        <span className="truncate">{user.email}</span>
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-500 italic">No email</span>
+                    )}
+                  </div>
                   <div className="pt-1 flex items-center justify-center sm:justify-start gap-3 text-xs">
                     <span
                       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium ${

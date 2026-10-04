@@ -5,6 +5,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import Attachment from "../models/attachment.model.js";
 import Task from "../models/task.model.js";
+import Project from "../models/project.model.js";
 
 // Resolve local uploads directory
 const __filename = fileURLToPath(import.meta.url);
@@ -27,8 +28,8 @@ const storage = multer.diskStorage({
   }
 });
 
-// Allowed file extensions
-const allowedExtensions = [".pdf", ".docx", ".png", ".jpg", ".jpeg"];
+// Allowed file extensions (ZIP, PDF, DOCX, PNG, JPG, JPEG)
+const allowedExtensions = [".pdf", ".docx", ".png", ".jpg", ".jpeg", ".zip"];
 
 // File filter validation
 const fileFilter = (req, file, cb) => {
@@ -37,7 +38,7 @@ const fileFilter = (req, file, cb) => {
     cb(null, true);
   } else {
     cb(
-      new Error("Unsupported file type. Only PDF, DOCX, PNG, JPG, and JPEG are allowed."),
+      new Error("Unsupported file type. Only ZIP, PDF, DOCX, PNG, JPG, and JPEG are allowed."),
       false
     );
   }
@@ -45,7 +46,7 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB limit for project ZIPs and documents
   fileFilter
 });
 
@@ -61,7 +62,7 @@ export const uploadMiddleware = (req, res, next) => {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(400).json({
           success: false,
-          message: "File size exceeds the 5 MB limit"
+          message: "File size exceeds the 50 MB limit"
         });
       }
       return res.status(400).json({
@@ -226,12 +227,153 @@ export const getAttachments = async (req, res, next) => {
   }
 };
 
+// @desc    Upload an attachment to a project
+// @route   POST /api/v1/projects/:projectId/attachments
+// @access  Private
+export const uploadProjectAttachment = async (req, res, next) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+
+    // Validate Project ID format
+    if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({
+        success: false,
+        message: "Invalid project ID"
+      });
+    }
+
+    // Validate that file was provided
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a file to upload"
+      });
+    }
+
+    // Verify project exists
+    const project = await Project.findById(projectId);
+    if (!project) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    // Check project access (owner, member, manager, or admin)
+    const isOwner = project.owner && project.owner.toString() === req.user._id.toString();
+    const isMember =
+      project.members &&
+      project.members.some((m) => m.toString() === req.user._id.toString());
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    const isManager = req.user.role?.toLowerCase() === "manager";
+
+    if (!isAdmin && !isManager && !isOwner && !isMember) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You do not have access to this project"
+      });
+    }
+
+    // Safe relative file path
+    const relativeFilePath = `/uploads/${req.file.filename}`;
+
+    const attachment = await Attachment.create({
+      project: projectId,
+      uploadedBy: req.user._id,
+      originalName: req.file.originalname,
+      fileName: req.file.filename,
+      filePath: relativeFilePath,
+      fileType: req.file.mimetype || path.extname(req.file.originalname).slice(1),
+      fileSize: req.file.size
+    });
+
+    await attachment.populate("uploadedBy", "name email avatar profilePicture");
+
+    return res.status(201).json({
+      success: true,
+      message: "Project resource uploaded successfully",
+      data: {
+        attachment
+      }
+    });
+  } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    next(error);
+  }
+};
+
+// @desc    Get all attachments for a project
+// @route   GET /api/v1/projects/:projectId/attachments
+// @access  Private
+export const getProjectAttachments = async (req, res, next) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+
+    // Validate Project ID format
+    if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid project ID"
+      });
+    }
+
+    // Verify project exists
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    // Check project access (owner, member, manager, or admin)
+    const isOwner = project.owner && project.owner.toString() === req.user._id.toString();
+    const isMember =
+      project.members &&
+      project.members.some((m) => m.toString() === req.user._id.toString());
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    const isManager = req.user.role?.toLowerCase() === "manager";
+
+    if (!isAdmin && !isManager && !isOwner && !isMember) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You do not have access to this project"
+      });
+    }
+
+    const attachments = await Attachment.find({ project: projectId })
+      .populate("uploadedBy", "name email avatar profilePicture")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Project attachments fetched successfully",
+      data: {
+        attachments
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Delete an attachment
-// @route   DELETE /api/v1/tasks/:taskId/attachments/:attachmentId
-// @access  Private (Uploader or Admin only)
+// @route   DELETE /api/v1/tasks/:taskId/attachments/:attachmentId or /api/v1/projects/:projectId/attachments/:attachmentId
+// @access  Private (Uploader, Project Owner, or Admin only)
 export const deleteAttachment = async (req, res, next) => {
   try {
-    const { taskId, attachmentId: paramAttachmentId, id } = req.params;
+    const { taskId, projectId, attachmentId: paramAttachmentId, id } = req.params;
     const attachmentId = paramAttachmentId || id;
 
     // Validate ID formats
@@ -242,6 +384,13 @@ export const deleteAttachment = async (req, res, next) => {
       });
     }
 
+    if (projectId && !mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid project ID"
+      });
+    }
+
     if (!attachmentId || !mongoose.Types.ObjectId.isValid(attachmentId)) {
       return res.status(400).json({
         success: false,
@@ -249,22 +398,10 @@ export const deleteAttachment = async (req, res, next) => {
       });
     }
 
-    // Verify task exists if taskId provided
-    if (taskId) {
-      const task = await Task.findById(taskId);
-      if (!task) {
-        return res.status(404).json({
-          success: false,
-          message: "Task not found"
-        });
-      }
-    }
-
     // Find attachment
     const query = { _id: attachmentId };
-    if (taskId) {
-      query.task = taskId;
-    }
+    if (taskId) query.task = taskId;
+    if (projectId) query.project = projectId;
 
     const attachment = await Attachment.findOne(query);
     if (!attachment) {
@@ -274,14 +411,22 @@ export const deleteAttachment = async (req, res, next) => {
       });
     }
 
-    // Authorization: Only uploader or Admin can delete
+    // Authorization: Only uploader, project owner, manager, or Admin can delete
     const isUploader = attachment.uploadedBy.toString() === req.user._id.toString();
     const isAdmin = req.user.role?.toLowerCase() === "admin";
+    const isManager = req.user.role?.toLowerCase() === "manager";
+    let isOwner = false;
+    if (attachment.project) {
+      const proj = await Project.findById(attachment.project);
+      if (proj && proj.owner && proj.owner.toString() === req.user._id.toString()) {
+        isOwner = true;
+      }
+    }
 
-    if (!isUploader && !isAdmin) {
+    if (!isUploader && !isAdmin && !isManager && !isOwner) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only the uploader or an Admin can delete this attachment"
+        message: "Access denied. Only the uploader, project owner, or an Admin can delete this attachment"
       });
     }
 

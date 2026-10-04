@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import API from "../services/api";
+import { useAuth } from "../context/AuthContext";
+
+const BACKEND_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1").replace(/\/api\/v1\/?$/, "");
 
 const Projects = () => {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const workspaceQuery = searchParams.get("workspace");
 
@@ -14,6 +18,16 @@ const Projects = () => {
   const [selectedProject, setSelectedProject] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Project Resources state
+  const [projectAttachments, setProjectAttachments] = useState([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [selectedResourceFile, setSelectedResourceFile] = useState(null);
+  const [uploadingResource, setUploadingResource] = useState(false);
+  const [resourceError, setResourceError] = useState("");
+  const [resourceSuccess, setResourceSuccess] = useState("");
+  const [linksFormData, setLinksFormData] = useState({ githubUrl: "", liveUrl: "" });
+  const [savingLinks, setSavingLinks] = useState(false);
+
   // Form state for creating a project
   const [formData, setFormData] = useState({
     name: "",
@@ -22,6 +36,8 @@ const Projects = () => {
   });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState("");
+
+  const projectQuery = searchParams.get("project");
 
   const fetchData = async () => {
     try {
@@ -60,6 +76,144 @@ const Projects = () => {
   useEffect(() => {
     fetchData();
   }, [workspaceQuery]);
+
+  // If URL has ?project=<id>, auto-open that project modal
+  useEffect(() => {
+    if (projectQuery && projects.length > 0) {
+      const match = projects.find((p) => p._id === projectQuery);
+      if (match) {
+        setSelectedProject(match);
+      }
+    }
+  }, [projectQuery, projects]);
+
+  // Load project resources whenever a project is selected
+  useEffect(() => {
+    if (selectedProject) {
+      setLinksFormData({
+        githubUrl: selectedProject.githubUrl || "",
+        liveUrl: selectedProject.liveUrl || ""
+      });
+      setResourceError("");
+      setResourceSuccess("");
+      setSelectedResourceFile(null);
+      fetchProjectAttachments(selectedProject._id);
+    } else {
+      setProjectAttachments([]);
+    }
+  }, [selectedProject]);
+
+  const fetchProjectAttachments = async (projectId) => {
+    try {
+      setAttachmentsLoading(true);
+      const res = await API.get(`/projects/${projectId}/attachments`);
+      if (res.data?.success) {
+        setProjectAttachments(res.data.data.attachments || []);
+      }
+    } catch {
+      // Ignore initial fetch errors silently
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  };
+
+  const handleUploadResource = async (e) => {
+    e.preventDefault();
+    if (!selectedResourceFile) {
+      setResourceError("Please select a file to upload");
+      return;
+    }
+
+    const allowed = [".zip", ".pdf", ".docx", ".png", ".jpg", ".jpeg"];
+    const fileExt = "." + selectedResourceFile.name.split(".").pop().toLowerCase();
+    if (!allowed.includes(fileExt)) {
+      setResourceError("Invalid file type. Allowed: ZIP, PDF, DOCX, PNG, JPG, JPEG.");
+      return;
+    }
+
+    if (selectedResourceFile.size > 50 * 1024 * 1024) {
+      setResourceError("File size exceeds 50 MB limit");
+      return;
+    }
+
+    try {
+      setUploadingResource(true);
+      setResourceError("");
+      setResourceSuccess("");
+
+      const data = new FormData();
+      data.append("file", selectedResourceFile);
+
+      const res = await API.post(
+        `/projects/${selectedProject._id}/attachments`,
+        data,
+        {
+          headers: { "Content-Type": "multipart/form-data" }
+        }
+      );
+
+      if (res.data?.success) {
+        setResourceSuccess("File attached successfully!");
+        setSelectedResourceFile(null);
+        const fileInput = document.getElementById("project-resource-file-input");
+        if (fileInput) fileInput.value = "";
+        fetchProjectAttachments(selectedProject._id);
+      }
+    } catch (err) {
+      setResourceError(err.response?.data?.message || "Failed to upload file");
+    } finally {
+      setUploadingResource(false);
+    }
+  };
+
+  const handleDeleteProjectAttachment = async (attachmentId) => {
+    if (!window.confirm("Are you sure you want to remove this resource file?")) return;
+    try {
+      const res = await API.delete(
+        `/projects/${selectedProject._id}/attachments/${attachmentId}`
+      );
+      if (res.data?.success) {
+        setProjectAttachments((prev) => prev.filter((a) => a._id !== attachmentId));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete attachment");
+    }
+  };
+
+  const handleSaveResourceLinks = async (e) => {
+    e.preventDefault();
+    try {
+      setSavingLinks(true);
+      setResourceError("");
+      setResourceSuccess("");
+
+      const res = await API.put(`/projects/${selectedProject._id}`, {
+        githubUrl: linksFormData.githubUrl.trim(),
+        liveUrl: linksFormData.liveUrl.trim()
+      });
+
+      if (res.data?.success) {
+        setResourceSuccess("Project links saved successfully!");
+        const updatedProj = res.data.data.project;
+        setSelectedProject((prev) => ({
+          ...prev,
+          githubUrl: updatedProj.githubUrl,
+          liveUrl: updatedProj.liveUrl
+        }));
+        setProjects((prev) =>
+          prev.map((p) =>
+            p._id === updatedProj._id
+              ? { ...p, githubUrl: updatedProj.githubUrl, liveUrl: updatedProj.liveUrl }
+              : p
+          )
+        );
+      }
+    } catch (err) {
+      setResourceError(err.response?.data?.message || "Failed to save project links");
+    } finally {
+      setSavingLinks(false);
+    }
+  };
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
@@ -229,15 +383,39 @@ const Projects = () => {
                       {proj.members?.length === 1 ? "" : "s"}
                     </span>
                   </p>
+                  {(proj.githubUrl || proj.liveUrl) && (
+                    <div className="flex items-center gap-3 pt-1">
+                      {proj.githubUrl && (
+                        <a
+                          href={proj.githubUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 font-medium"
+                        >
+                          💻 GitHub
+                        </a>
+                      )}
+                      {proj.liveUrl && (
+                        <a
+                          href={proj.liveUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium"
+                        >
+                          🌐 Live Demo
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
                 <button
                   onClick={() => setSelectedProject(proj)}
-                  className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium"
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium flex items-center gap-1"
                 >
-                  View Details
+                  📁 View Details & Resources
                 </button>
                 <Link
                   to={`/task-board?project=${proj._id}`}
@@ -341,7 +519,7 @@ const Projects = () => {
       {/* Project Details Modal */}
       {selectedProject && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -376,7 +554,7 @@ const Projects = () => {
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
                 Team Members ({selectedProject.members?.length || 0})
               </h3>
-              <div className="max-h-48 overflow-y-auto space-y-2">
+              <div className="max-h-36 overflow-y-auto space-y-2">
                 {selectedProject.members?.map((member) => (
                   <div
                     key={member._id}
@@ -394,6 +572,195 @@ const Projects = () => {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Project Resources */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>📁</span> Project Resources
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Final deliverables: Project ZIP file, documentation, GitHub repo, and live demo link.
+                </p>
+              </div>
+
+              {resourceSuccess && (
+                <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs">
+                  {resourceSuccess}
+                </div>
+              )}
+
+              {resourceError && (
+                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs">
+                  {resourceError}
+                </div>
+              )}
+
+              {/* Upload File */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Upload File
+                </label>
+                <form onSubmit={handleUploadResource} className="flex items-center gap-2">
+                  <input
+                    id="project-resource-file-input"
+                    type="file"
+                    accept=".zip,.pdf,.docx,.png,.jpg,.jpeg"
+                    onChange={(e) => {
+                      setSelectedResourceFile(e.target.files[0] || null);
+                      setResourceError("");
+                      setResourceSuccess("");
+                    }}
+                    className="flex-1 text-xs text-slate-600 dark:text-slate-300 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200 hover:file:bg-slate-200 dark:hover:file:bg-slate-600 cursor-pointer"
+                  />
+                  <button
+                    type="submit"
+                    disabled={uploadingResource || !selectedResourceFile}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors disabled:opacity-50 shrink-0 shadow-xs"
+                  >
+                    {uploadingResource ? "Uploading..." : "Upload"}
+                  </button>
+                </form>
+                <p className="text-[11px] text-slate-400">
+                  Supported formats: ZIP, PDF, DOCX, PNG, JPG (Max 50 MB)
+                </p>
+              </div>
+
+              {/* Uploaded Files List */}
+              {attachmentsLoading ? (
+                <p className="text-xs text-slate-400 text-center py-2">Loading attachments...</p>
+              ) : projectAttachments.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Attached Files ({projectAttachments.length}):
+                  </p>
+                  <div className="max-h-36 overflow-y-auto space-y-1.5">
+                    {projectAttachments.map((file) => {
+                      const ext = (file.originalName || "").split(".").pop().toLowerCase();
+                      const isZip = ext === "zip";
+                      const isImg = ["png", "jpg", "jpeg"].includes(ext);
+                      const fileIcon = isZip ? "📦" : isImg ? "🖼" : "📄";
+                      const sizeFormatted = file.fileSize
+                        ? file.fileSize > 1024 * 1024
+                          ? `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`
+                          : `${(file.fileSize / 1024).toFixed(1)} KB`
+                        : null;
+                      const fileUrl =
+                        file.url ||
+                        (file.filePath
+                          ? file.filePath.startsWith("http")
+                            ? file.filePath
+                            : `${BACKEND_BASE_URL}${file.filePath.startsWith("/") ? "" : "/"}${file.filePath}`
+                          : null);
+
+                      return (
+                        <div
+                          key={file._id}
+                          className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs"
+                        >
+                          <div className="flex items-center gap-2 truncate mr-2">
+                            <span className="text-base">{fileIcon}</span>
+                            <div className="truncate">
+                              <p className="font-medium text-slate-800 dark:text-slate-200 truncate" title={file.originalName}>
+                                {file.originalName}
+                              </p>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                {sizeFormatted ? `${sizeFormatted} • ` : ""}
+                                {file.uploadedBy?.name ? `Uploaded by ${file.uploadedBy.name}` : "Uploaded"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {fileUrl && (
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download
+                                className="px-2.5 py-1 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-xs font-medium transition-colors"
+                              >
+                                Download
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProjectAttachment(file._id)}
+                              className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 p-1"
+                              title="Delete file"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Links Form */}
+              <form onSubmit={handleSaveResourceLinks} className="space-y-3 pt-1">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      GitHub Repository
+                    </label>
+                    {linksFormData.githubUrl && (
+                      <a
+                        href={linksFormData.githubUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-medium"
+                      >
+                        Open ↗
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="url"
+                    value={linksFormData.githubUrl}
+                    onChange={(e) => setLinksFormData({ ...linksFormData, githubUrl: e.target.value })}
+                    placeholder="https://github.com/username/repository"
+                    className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Live Demo URL
+                    </label>
+                    {linksFormData.liveUrl && (
+                      <a
+                        href={linksFormData.liveUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium"
+                      >
+                        Open ↗
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="url"
+                    value={linksFormData.liveUrl}
+                    onChange={(e) => setLinksFormData({ ...linksFormData, liveUrl: e.target.value })}
+                    placeholder="https://yourproject.com"
+                    className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    disabled={savingLinks}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors disabled:opacity-50 shadow-xs"
+                  >
+                    {savingLinks ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </form>
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60">

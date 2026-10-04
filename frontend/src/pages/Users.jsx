@@ -292,8 +292,19 @@ const Users = () => {
                           </td>
 
                           {/* Email */}
-                          <td className="py-3.5 px-4 sm:px-6 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                            {u.email}
+                          <td className="py-3.5 px-4 sm:px-6 whitespace-nowrap">
+                            {u.email ? (
+                              <a
+                                href={`mailto:${u.email}`}
+                                className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition-colors"
+                                title={`Send email to ${u.email}`}
+                              >
+                                <span>📧</span>
+                                <span>{u.email}</span>
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 italic">No email</span>
+                            )}
                           </td>
 
                           {/* Role */}
