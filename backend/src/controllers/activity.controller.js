@@ -41,7 +41,7 @@ export const getProjectActivityLogs = async (req, res, next) => {
 
     // Fetch activities sorted with latest first and populated user details
     const activities = await ActivityLog.find({ project: projectId })
-      .populate("user", "name email avatar")
+      .populate("user", "name email avatar profilePicture")
       .populate("task", "title")
       .sort({ createdAt: -1 });
 

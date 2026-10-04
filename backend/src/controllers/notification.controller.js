@@ -7,7 +7,7 @@ import Notification from "../models/notification.model.js";
 export const getNotifications = async (req, res, next) => {
   try {
     const notifications = await Notification.find({ recipient: req.user._id })
-      .populate("sender", "name email avatar")
+      .populate("sender", "name email avatar profilePicture")
       .populate("task", "title")
       .sort({ createdAt: -1 });
 

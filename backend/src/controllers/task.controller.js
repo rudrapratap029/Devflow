@@ -283,8 +283,8 @@ export const getTasks = async (req, res, next) => {
     const tasks = await Task.find(filter)
       .populate("project", "name")
       .populate("workspace", "name")
-      .populate("assignedTo", "name email avatar")
-      .populate("createdBy", "name email avatar")
+      .populate("assignedTo", "name email avatar profilePicture skills")
+      .populate("createdBy", "name email avatar profilePicture")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -324,8 +324,8 @@ export const getTaskById = async (req, res, next) => {
     const task = await Task.findById(taskId)
       .populate("project", "name members owner")
       .populate("workspace", "name")
-      .populate("assignedTo", "name email avatar")
-      .populate("createdBy", "name email avatar");
+      .populate("assignedTo", "name email avatar profilePicture skills")
+      .populate("createdBy", "name email avatar profilePicture");
 
     if (!task) {
       return res.status(404).json({
@@ -514,8 +514,8 @@ export const updateTask = async (req, res, next) => {
 
     await task.populate("project", "name");
     await task.populate("workspace", "name");
-    await task.populate("assignedTo", "name email avatar");
-    await task.populate("createdBy", "name email avatar");
+    await task.populate("assignedTo", "name email avatar profilePicture skills");
+    await task.populate("createdBy", "name email avatar profilePicture");
 
     const taskProjectId = task.project._id || task.project;
 

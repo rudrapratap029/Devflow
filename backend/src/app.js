@@ -32,8 +32,15 @@ app.use(express.urlencoded({ extended: true }));
 // Cookie parser
 app.use(cookieParser());
 
-// Serve static uploads
-app.use("/uploads", express.static(uploadDir));
+// Serve static uploads (allow cross-origin for frontend image display)
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  express.static(uploadDir)
+);
 
 // Health Check Route
 app.get("/", (req, res) => {

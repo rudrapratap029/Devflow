@@ -44,8 +44,8 @@ export const getWorkspaces = async (req, res, next) => {
   try {
     // Return only workspaces where the logged-in user is a member
     const workspaces = await Workspace.find({ members: req.user._id })
-      .populate("owner", "name email avatar")
-      .populate("members", "name email avatar")
+      .populate("owner", "name email avatar profilePicture")
+      .populate("members", "name email avatar profilePicture")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -76,8 +76,8 @@ export const getWorkspaceById = async (req, res, next) => {
     }
 
     const workspace = await Workspace.findById(id)
-      .populate("owner", "name email avatar")
-      .populate("members", "name email avatar");
+      .populate("owner", "name email avatar profilePicture")
+      .populate("members", "name email avatar profilePicture");
 
     if (!workspace) {
       return res.status(404).json({
@@ -161,8 +161,8 @@ export const updateWorkspace = async (req, res, next) => {
 
     await workspace.save();
 
-    await workspace.populate("owner", "name email avatar");
-    await workspace.populate("members", "name email avatar");
+    await workspace.populate("owner", "name email avatar profilePicture");
+    await workspace.populate("members", "name email avatar profilePicture");
 
     return res.status(200).json({
       success: true,
@@ -292,8 +292,8 @@ export const addMember = async (req, res, next) => {
     workspace.members.push(userId);
     await workspace.save();
 
-    await workspace.populate("owner", "name email avatar");
-    await workspace.populate("members", "name email avatar");
+    await workspace.populate("owner", "name email avatar profilePicture");
+    await workspace.populate("members", "name email avatar profilePicture");
 
     return res.status(200).json({
       success: true,
@@ -373,8 +373,8 @@ export const removeMember = async (req, res, next) => {
     );
     await workspace.save();
 
-    await workspace.populate("owner", "name email avatar");
-    await workspace.populate("members", "name email avatar");
+    await workspace.populate("owner", "name email avatar profilePicture");
+    await workspace.populate("members", "name email avatar profilePicture");
 
     return res.status(200).json({
       success: true,

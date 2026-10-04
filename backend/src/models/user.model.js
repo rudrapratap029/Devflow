@@ -29,9 +29,25 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: ""
     },
+    profilePicture: {
+      type: String,
+      default: ""
+    },
     isActive: {
       type: Boolean,
       default: true
+    },
+    skills: [
+      {
+        type: String,
+        trim: true
+      }
+    ],
+    bio: {
+      type: String,
+      default: "",
+      trim: true,
+      maxLength: [500, "Bio cannot exceed 500 characters"]
     },
     refreshToken: {
       type: String,

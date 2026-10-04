@@ -120,7 +120,7 @@ export const getRecentTasks = async (req, res, next) => {
 
     const tasks = await Task.find(taskFilter)
       .populate("project", "name")
-      .populate("assignedTo", "name email avatar")
+      .populate("assignedTo", "name email avatar profilePicture")
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -150,7 +150,7 @@ export const getRecentActivities = async (req, res, next) => {
     }
 
     const activities = await ActivityLog.find(activityFilter)
-      .populate("user", "name email avatar")
+      .populate("user", "name email avatar profilePicture")
       .populate("task", "title")
       .populate("project", "name")
       .sort({ createdAt: -1 })

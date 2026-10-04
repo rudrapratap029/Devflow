@@ -153,7 +153,7 @@ export const uploadAttachment = async (req, res, next) => {
       fileSize: req.file.size
     });
 
-    await attachment.populate("uploadedBy", "name email avatar");
+    await attachment.populate("uploadedBy", "name email avatar profilePicture");
 
     return res.status(201).json({
       success: true,
@@ -211,7 +211,7 @@ export const getAttachments = async (req, res, next) => {
     }
 
     const attachments = await Attachment.find({ task: taskId })
-      .populate("uploadedBy", "name email avatar")
+      .populate("uploadedBy", "name email avatar profilePicture")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({

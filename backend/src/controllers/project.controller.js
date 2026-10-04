@@ -131,8 +131,8 @@ export const getProjects = async (req, res, next) => {
 
     const projects = await Project.find(filter)
       .populate("workspace", "name")
-      .populate("owner", "name email avatar")
-      .populate("members", "name email avatar")
+      .populate("owner", "name email avatar profilePicture")
+      .populate("members", "name email avatar profilePicture skills")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -171,8 +171,8 @@ export const getProjectById = async (req, res, next) => {
 
     const project = await Project.findById(projectId)
       .populate("workspace", "name")
-      .populate("owner", "name email avatar")
-      .populate("members", "name email avatar");
+      .populate("owner", "name email avatar profilePicture")
+      .populate("members", "name email avatar profilePicture skills");
 
     if (!project) {
       return res.status(404).json({
@@ -267,8 +267,8 @@ export const updateProject = async (req, res, next) => {
     await project.save();
 
     await project.populate("workspace", "name");
-    await project.populate("owner", "name email avatar");
-    await project.populate("members", "name email avatar");
+    await project.populate("owner", "name email avatar profilePicture");
+    await project.populate("members", "name email avatar profilePicture skills");
 
     return res.status(200).json({
       success: true,
@@ -419,8 +419,8 @@ export const addProjectMember = async (req, res, next) => {
     await project.save();
 
     await project.populate("workspace", "name");
-    await project.populate("owner", "name email avatar");
-    await project.populate("members", "name email avatar");
+    await project.populate("owner", "name email avatar profilePicture");
+    await project.populate("members", "name email avatar profilePicture skills");
 
     return res.status(200).json({
       success: true,
@@ -502,8 +502,8 @@ export const removeProjectMember = async (req, res, next) => {
     await project.save();
 
     await project.populate("workspace", "name");
-    await project.populate("owner", "name email avatar");
-    await project.populate("members", "name email avatar");
+    await project.populate("owner", "name email avatar profilePicture");
+    await project.populate("members", "name email avatar profilePicture skills");
 
     return res.status(200).json({
       success: true,

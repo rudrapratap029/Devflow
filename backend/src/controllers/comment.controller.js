@@ -67,7 +67,7 @@ export const createComment = async (req, res, next) => {
     });
 
     // Populate user info for response
-    await comment.populate("user", "name email avatar");
+    await comment.populate("user", "name email avatar profilePicture");
 
     // Log comment creation activity
     await ActivityLog.create({
@@ -168,7 +168,7 @@ export const getCommentsByTaskId = async (req, res, next) => {
 
     // Fetch comments sorted chronologically with author details
     const comments = await Comment.find({ task: taskId })
-      .populate("user", "name email avatar")
+      .populate("user", "name email avatar profilePicture")
       .sort({ createdAt: 1 });
 
     return res.status(200).json({
@@ -229,7 +229,7 @@ export const updateComment = async (req, res, next) => {
     await comment.save();
 
     // Populate user info for response
-    await comment.populate("user", "name email avatar");
+    await comment.populate("user", "name email avatar profilePicture");
 
     return res.status(200).json({
       success: true,
