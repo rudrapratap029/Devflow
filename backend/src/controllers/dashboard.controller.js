@@ -9,7 +9,9 @@ const getUserProjectFilter = async (user) => {
   if (user.role === "admin") {
     return {};
   }
-  const userProjects = await Project.find({ members: user._id }).select("_id");
+  const userProjects = await Project.find({
+    $or: [{ members: user._id }, { owner: user._id }]
+  }).select("_id");
   const projectIds = userProjects.map((p) => p._id);
   return { project: { $in: projectIds } };
 };
@@ -33,9 +35,13 @@ export const getOverview = async (req, res, next) => {
       totalComments = await Comment.countDocuments();
     } else {
       totalWorkspaces = await Workspace.countDocuments({ members: req.user._id });
-      totalProjects = await Project.countDocuments({ members: req.user._id });
+      totalProjects = await Project.countDocuments({
+        $or: [{ members: req.user._id }, { owner: req.user._id }]
+      });
 
-      const userProjects = await Project.find({ members: req.user._id }).select("_id");
+      const userProjects = await Project.find({
+        $or: [{ members: req.user._id }, { owner: req.user._id }]
+      }).select("_id");
       const projectIds = userProjects.map((p) => p._id);
 
       totalTasks = await Task.countDocuments({ project: { $in: projectIds } });
@@ -144,7 +150,9 @@ export const getRecentActivities = async (req, res, next) => {
     let activityFilter = {};
 
     if (req.user.role !== "admin") {
-      const userProjects = await Project.find({ members: req.user._id }).select("_id");
+      const userProjects = await Project.find({
+        $or: [{ members: req.user._id }, { owner: req.user._id }]
+      }).select("_id");
       const projectIds = userProjects.map((p) => p._id);
       activityFilter = { project: { $in: projectIds } };
     }

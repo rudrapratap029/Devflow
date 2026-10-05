@@ -149,77 +149,80 @@ const TaskBoard = () => {
     setShowModal(true);
   };
 
-  // Generate task suggestion and recommend users with AI
+  // AI Task Generator Handler
   const handleAiGenerate = async () => {
-    if (!formData.title || !formData.title.trim()) {
-      setAiError("Please enter a task title first to generate suggestions.");
-      return;
-    }
+    if (!formData.title.trim()) return;
 
     try {
       setAiLoading(true);
       setAiError("");
+      setAiSuggestion(null);
+      setRecommendedUsers([]);
 
-      // 1. Fetch AI Task Suggestion
-      const suggestionRes = await API.post("/ai/task-suggestion", {
-        title: formData.title.trim(),
-        description: formData.description
+      const activeProject = projects.find((p) => p._id === selectedProjectId);
+      const projectId = activeProject?._id || selectedProjectId;
+
+      const res = await API.post("/ai/generate-task", {
+        title: formData.title,
+        projectContext: activeProject?.name || "",
+        projectId: projectId
       });
 
-      const suggestionData = suggestionRes.data?.data || suggestionRes.data || {};
-      setAiSuggestion(suggestionData);
+      if (res.data?.success) {
+        const data = res.data.data;
+        setAiSuggestion(data);
 
-      // Populate description if user hasn't filled it in yet
-      if (!formData.description || !formData.description.trim()) {
-        setFormData((prev) => ({
-          ...prev,
-          description: suggestionData.description || prev.description
-        }));
-      }
+        // Pre-populate description if currently empty or basic
+        if (!formData.description.trim() && data.description) {
+          let enrichedDesc = data.description;
+          if (data.acceptanceCriteria && data.acceptanceCriteria.length > 0) {
+            enrichedDesc +=
+              `\n\nAcceptance Criteria:\n` +
+              data.acceptanceCriteria.map((c) => `✓ ${c}`).join("\n");
+          }
+          if (data.subtasks && data.subtasks.length > 0) {
+            enrichedDesc +=
+              `\n\nSubtasks:\n` + data.subtasks.map((s) => `✓ ${s}`).join("\n");
+          }
+          setFormData((prev) => ({
+            ...prev,
+            description: enrichedDesc
+          }));
+        }
 
-      // 2. Fetch User Recommendations (for Admin/Manager decision-support)
-      if (currentUser?.role === "admin" || currentUser?.role === "manager") {
-        const targetProjectId = formData.project || selectedProjectId || (projects[0]?._id || "");
-        const recRes = await API.post("/ai/recommend-users", {
-          title: formData.title.trim(),
-          description: suggestionData.description || formData.description,
-          projectId: targetProjectId
-        });
-
-        const recUsers = recRes.data?.data || recRes.data?.recommendations || [];
-        setRecommendedUsers(Array.isArray(recUsers) ? recUsers : []);
+        // Set recommended users if available
+        if (data.recommendedUsers && Array.isArray(data.recommendedUsers)) {
+          setRecommendedUsers(data.recommendedUsers);
+          if (!formData.assignedTo && data.recommendedUsers.length > 0) {
+            setFormData((prev) => ({
+              ...prev,
+              assignedTo:
+                data.recommendedUsers[0].userId || data.recommendedUsers[0]._id
+            }));
+          }
+        }
       }
     } catch (err) {
-      console.error("AI Assistant error:", err);
-      setAiError(err.response?.data?.message || "Failed to generate AI suggestions");
+      setAiError(
+        err.response?.data?.message ||
+          "AI assistant is currently unavailable. Please enter task details manually."
+      );
     } finally {
       setAiLoading(false);
     }
   };
 
-  // Handle Create Task
+  // Create Task Submission
   const handleCreateTask = async (e) => {
     e.preventDefault();
     setCreateError("");
     setCreateLoading(true);
 
     try {
-      if (formData.assignedTo && (currentUser?.role === "admin" || currentUser?.role === "manager")) {
-        const targetProj = projects.find((p) => p._id === formData.project);
-        const isMember = targetProj?.members?.some((m) => (m._id || m) === formData.assignedTo);
-        if (!isMember && targetProj) {
-          const wsId = targetProj.workspace?._id || targetProj.workspace;
-          if (wsId) {
-            await API.post(`/workspaces/${wsId}/members`, { userId: formData.assignedTo }).catch(() => {});
-          }
-          await API.post(`/projects/${targetProj._id}/members`, { userId: formData.assignedTo }).catch(() => {});
-        }
-      }
-
       const payload = {
         title: formData.title,
         description: formData.description,
-        project: formData.project,
+        project: formData.project || selectedProjectId,
         status: formData.status,
         priority: formData.priority
       };
@@ -241,10 +244,9 @@ const TaskBoard = () => {
     }
   };
 
-  // Find active project to get member list for assignee dropdown
+  // Fetch available users for task assignment
   const activeProject = projects.find((p) => p._id === selectedProjectId);
 
-  // Fetch available users for task assignment (Admin/Manager)
   useEffect(() => {
     const fetchUsers = async () => {
       if (currentUser?.role === "admin" || currentUser?.role === "manager") {
@@ -304,15 +306,24 @@ const TaskBoard = () => {
     { id: "Done", title: "Done", dotColor: "bg-emerald-500" }
   ];
 
-  const getPriorityStyle = (priority) => {
+  const getPriorityBadge = (priority) => {
     switch (priority) {
       case "High":
-        return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50";
+        return {
+          wrapper: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50",
+          dot: "bg-rose-500"
+        };
       case "Medium":
-        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50";
+        return {
+          wrapper: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50",
+          dot: "bg-amber-500"
+        };
       case "Low":
       default:
-        return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+        return {
+          wrapper: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+          dot: "bg-slate-400"
+        };
     }
   };
 
@@ -321,20 +332,22 @@ const TaskBoard = () => {
       {/* Top Bar: Title, Project Selector, Create Task Button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Kanban Task Board</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Track task progress across Todo, In Progress, and Done stages
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Kanban Task Board
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Track workflow progress across Todo, In Progress, and Done stages
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           {/* Project Selector */}
           <div className="flex items-center space-x-2">
             <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Project:</span>
             <select
               value={selectedProjectId}
               onChange={(e) => handleProjectSelect(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+              className="px-3 py-2 rounded-lg bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
             >
               {projects.length === 0 ? (
                 <option value="">No projects available</option>
@@ -351,43 +364,53 @@ const TaskBoard = () => {
           {selectedProjectId && (
             <Link
               to={`/projects?project=${selectedProjectId}`}
-              className="px-3 py-2 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-300 dark:border-slate-700 shadow-xs flex items-center gap-1.5"
+              className="px-3 py-2 rounded-lg bg-white dark:bg-[#111827] hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-300 dark:border-slate-700 shadow-xs inline-flex items-center gap-1.5"
               title="View and attach project resources, deliverables, and links"
             >
-              <span>📁</span> Resources
+              <svg className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+              </svg>
+              <span>Resources</span>
             </Link>
           )}
 
           <button
             onClick={() => openCreateModal("Todo")}
             disabled={!selectedProjectId}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 shadow-xs"
           >
-            + New Task
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>New Task</span>
           </button>
         </div>
       </div>
 
-      {/* Feature 22: Search and Filter Toolbar */}
+      {/* Search and Filter Toolbar */}
       {selectedProjectId && (
-        <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 sm:p-3.5 shadow-xs">
+        <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3 sm:p-3.5 shadow-xs">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[200px]">
-            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
-              🔍
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
             </span>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks..."
+              placeholder="Search tasks by title or details..."
               className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
             />
           </div>
 
           {/* Priority Filter */}
           <div className="flex items-center space-x-1.5">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Priority:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Priority:</span>
             <select
               value={filterPriority}
               onChange={(e) => setFilterPriority(e.target.value)}
@@ -402,11 +425,11 @@ const TaskBoard = () => {
 
           {/* Assignee Filter */}
           <div className="flex items-center space-x-1.5">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Assignee:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Assignee:</span>
             <select
               value={filterAssignee}
               onChange={(e) => setFilterAssignee(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 max-w-[150px] truncate"
+              className="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 max-w-[160px] truncate"
             >
               <option value="All">All Assignees</option>
               {(availableUsers.length > 0 ? availableUsers : activeProject?.members || []).map((m) => {
@@ -435,21 +458,21 @@ const TaskBoard = () => {
       )}
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-sm">
+        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-sm">
           {error}
         </div>
       )}
 
       {/* No Project Warning */}
       {projects.length === 0 && !loading && (
-        <div className="text-center py-16 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 shadow-xs">
+        <div className="text-center py-16 bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-8 shadow-xs">
           <p className="text-slate-900 dark:text-white font-semibold">No projects available</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">
             Create a project first to start managing tasks on the board.
           </p>
           <Link
             to="/projects"
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium inline-block shadow-xs"
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium inline-block shadow-xs"
           >
             Go to Projects
           </Link>
@@ -459,111 +482,123 @@ const TaskBoard = () => {
       {/* Kanban 3-Column Layout with Horizontal Scroll for Mobile */}
       {selectedProjectId && (
         <div className="overflow-x-auto pb-4">
-          <div className="min-w-[850px] md:min-w-0 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="min-w-[850px] md:min-w-0 grid grid-cols-1 md:grid-cols-3 gap-5">
             {columns.map((col) => {
               const colTasks = filteredTasks.filter((t) => t.status === col.id);
 
               return (
                 <div
                   key={col.id}
-                  className="bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70 rounded-2xl p-4 flex flex-col min-h-[500px]"
+                  className="bg-slate-100/60 dark:bg-[#0e131f]/70 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col min-h-[520px]"
                 >
                   {/* Column Header */}
-                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200 dark:border-slate-700/60">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/80 dark:border-slate-800/80">
                     <div className="flex items-center space-x-2">
                       <span className={`w-2 h-2 rounded-full ${col.dotColor}`} />
-                      <span className="font-semibold text-sm text-slate-900 dark:text-white">
+                      <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-white">
                         {col.title}
                       </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium border border-slate-200 dark:border-slate-600 shadow-2xs">
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium border border-slate-200/80 dark:border-slate-700 shadow-2xs">
                         {colTasks.length}
                       </span>
                     </div>
                     <button
                       onClick={() => openCreateModal(col.id)}
                       title={`Add task to ${col.title}`}
-                      className="text-slate-400 hover:text-slate-700 dark:hover:text-white text-base p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors"
+                      className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-slate-800/60 transition-colors"
                     >
-                      +
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
                     </button>
                   </div>
 
                   {/* Column Tasks */}
-                  <div className="space-y-3 flex-1 overflow-y-auto">
+                  <div className="space-y-2.5 flex-1 overflow-y-auto pr-0.5">
                     {colTasks.length === 0 ? (
-                      <div className="h-32 flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-300 dark:border-slate-700/60 rounded-xl">
+                      <div className="h-32 flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-300 dark:border-slate-800 rounded-lg">
                         No tasks in {col.title}
                       </div>
                     ) : (
-                      colTasks.map((task) => (
-                        <div
-                          key={task._id}
-                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-xs flex flex-col justify-between space-y-3"
-                        >
-                          {/* Title & Priority */}
-                          <div>
-                            <div className="flex items-start justify-between gap-2">
-                              <Link
-                                to={`/tasks/${task._id}`}
-                                className="font-medium text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm line-clamp-2 transition-colors"
-                              >
-                                {task.title}
-                              </Link>
-                              <span
-                                className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border shrink-0 ${getPriorityStyle(
-                                  task.priority
-                                )}`}
-                              >
-                                {task.priority}
-                              </span>
-                            </div>
+                      colTasks.map((task) => {
+                        const priorityInfo = getPriorityBadge(task.priority);
 
-                            {task.description && (
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2">
-                                {task.description}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Assignee & Due Date */}
-                          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                            <div className="flex items-center space-x-1.5 truncate">
-                              <div className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-600/30 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-[10px] shrink-0 border border-indigo-100 dark:border-indigo-800">
-                                {task.assignedTo?.name
-                                  ? task.assignedTo.name.charAt(0)
-                                  : "—"}
+                        return (
+                          <div
+                            key={task._id}
+                            className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/90 rounded-lg p-3.5 hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-2xs flex flex-col justify-between space-y-2.5"
+                          >
+                            {/* Title & Priority */}
+                            <div>
+                              <div className="flex items-start justify-between gap-2">
+                                <Link
+                                  to={`/tasks/${task._id}`}
+                                  className="font-medium text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs sm:text-sm line-clamp-2 transition-colors"
+                                >
+                                  {task.title}
+                                </Link>
+                                <span
+                                  className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border shrink-0 inline-flex items-center gap-1 ${priorityInfo.wrapper}`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full ${priorityInfo.dot}`}></span>
+                                  {task.priority}
+                                </span>
                               </div>
-                              <span className="truncate">
-                                {task.assignedTo?.name || "Unassigned"}
-                              </span>
+
+                              {task.description && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                                  {task.description}
+                                </p>
+                              )}
                             </div>
 
-                            {task.dueDate && (
-                              <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0">
-                                📅 {new Date(task.dueDate).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
+                            {/* Assignee & Due Date */}
+                            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                              <div className="flex items-center space-x-1.5 truncate mr-2">
+                                <div className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-[10px] shrink-0 border border-indigo-100 dark:border-indigo-800/60">
+                                  {task.assignedTo?.name
+                                    ? task.assignedTo.name.charAt(0).toUpperCase()
+                                    : "—"}
+                                </div>
+                                <span className="truncate text-[11px]">
+                                  {task.assignedTo?.name || "Unassigned"}
+                                </span>
+                              </div>
 
-                          {/* Status Change Selector */}
-                          <div className="flex items-center justify-between pt-1">
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                              Move to:
-                            </span>
-                            <select
-                              value={task.status}
-                              onChange={(e) =>
-                                handleStatusChange(task._id, e.target.value)
-                              }
-                              className="text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            >
-                              <option value="Todo">Todo</option>
-                              <option value="In Progress">In Progress</option>
-                              <option value="Done">Done</option>
-                            </select>
+                              {task.dueDate && (
+                                <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 inline-flex items-center gap-1">
+                                  <svg className="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                                    <line x1="16" x2="16" y1="2" y2="6" />
+                                    <line x1="8" x2="8" y1="2" y2="6" />
+                                    <line x1="3" x2="21" y1="10" y2="10" />
+                                  </svg>
+                                  <span>{new Date(task.dueDate).toLocaleDateString()}</span>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Status Change Selector */}
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                                Status:
+                              </span>
+                              <select
+                                value={task.status}
+                                onChange={(e) =>
+                                  handleStatusChange(task._id, e.target.value)
+                                }
+                                className="text-[11px] bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              >
+                                <option value="Todo">Todo</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Done">Done</option>
+                              </select>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -576,9 +611,11 @@ const TaskBoard = () => {
       {/* Create Task Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Create New Task</h2>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                Create New Task
+              </h2>
               <button
                 type="button"
                 onClick={() => {
@@ -590,7 +627,7 @@ const TaskBoard = () => {
                     setSearchParams(selectedProjectId ? { project: selectedProjectId } : {});
                   }
                 }}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
                 title="Close modal"
               >
                 ✕
@@ -598,7 +635,7 @@ const TaskBoard = () => {
             </div>
 
             {createError && (
-              <div className="mb-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-sm">
+              <div className="mb-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs sm:text-sm">
                 {createError}
               </div>
             )}
@@ -606,14 +643,14 @@ const TaskBoard = () => {
             <form onSubmit={handleCreateTask} className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                     Task Title *
                   </label>
                   <button
                     type="button"
                     onClick={handleAiGenerate}
                     disabled={aiLoading || !formData.title.trim()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     title="Generate description, criteria, subtasks, and user recommendations"
                   >
                     {aiLoading ? (
@@ -626,7 +663,10 @@ const TaskBoard = () => {
                       </>
                     ) : (
                       <>
-                        <span>✨ Generate with AI</span>
+                        <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+                        </svg>
+                        <span>AI Assistant</span>
                       </>
                     )}
                   </button>
@@ -638,7 +678,7 @@ const TaskBoard = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
-                  placeholder="e.g. Build Login API or Create React Dashboard"
+                  placeholder="e.g. Build Authentication API or Create React Dashboard"
                   className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                 />
                 {aiError && (
@@ -648,15 +688,18 @@ const TaskBoard = () => {
 
               {/* AI Suggestion Breakdown Panel */}
               {aiSuggestion && (
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-indigo-100 dark:border-indigo-950/60 space-y-3">
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-indigo-200/80 dark:border-indigo-900/60 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <span className="text-indigo-600 dark:text-indigo-400">✨</span> AI Task Assistant
+                        <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+                        </svg>
+                        <span>AI Task Breakdown</span>
                       </span>
                       {aiSuggestion.estimatedTime && (
                         <span className="px-2 py-0.5 rounded-md bg-indigo-100/70 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-medium">
-                          Estimated Time: {aiSuggestion.estimatedTime}
+                          Time: {aiSuggestion.estimatedTime}
                         </span>
                       )}
                     </div>
@@ -685,7 +728,7 @@ const TaskBoard = () => {
                   {/* AI Acceptance Criteria & Subtasks in 2 compact columns */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     {aiSuggestion.acceptanceCriteria && aiSuggestion.acceptanceCriteria.length > 0 && (
-                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
                         <span className="font-semibold text-emerald-700 dark:text-emerald-400 block mb-1">
                           Acceptance Criteria:
                         </span>
@@ -701,7 +744,7 @@ const TaskBoard = () => {
                     )}
 
                     {aiSuggestion.subtasks && aiSuggestion.subtasks.length > 0 && (
-                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
                         <span className="font-semibold text-indigo-700 dark:text-indigo-400 block mb-1">
                           Subtasks:
                         </span>
@@ -720,7 +763,7 @@ const TaskBoard = () => {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                   Description
                 </label>
                 <textarea
@@ -729,20 +772,26 @@ const TaskBoard = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Details and criteria for this task"
+                  placeholder="Details, requirements, and criteria for this task"
                   className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                 />
               </div>
 
               {/* Recommended Team Members Panel */}
               {recommendedUsers.length > 0 && (
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 space-y-2.5">
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <span>👥</span> Recommended Team Members
+                      <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                      <span>Recommended Assignees</span>
                     </span>
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Smart match by skills, bio & workload
+                      Matched by skills & workload
                     </span>
                   </div>
 
@@ -762,7 +811,7 @@ const TaskBoard = () => {
                           className={`p-2.5 rounded-lg border text-xs transition-all ${
                             isSelected
                               ? "bg-indigo-50/90 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/20"
-                              : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -819,7 +868,7 @@ const TaskBoard = () => {
                               {rec.skills.map((skill, idx) => (
                                 <span
                                   key={idx}
-                                  className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 text-[10px] font-medium"
+                                  className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-medium"
                                 >
                                   {skill}
                                 </span>
@@ -835,8 +884,8 @@ const TaskBoard = () => {
                           )}
 
                           {/* Reason & Workload */}
-                          <div className="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                            <span className="pr-2">
+                          <div className="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="pr-2 truncate">
                               <strong className="text-slate-700 dark:text-slate-300">Reason: </strong>
                               {rec.reason}
                             </span>
@@ -853,7 +902,7 @@ const TaskBoard = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                     Status
                   </label>
                   <select
@@ -870,7 +919,7 @@ const TaskBoard = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                     Priority
                   </label>
                   <select
@@ -890,7 +939,7 @@ const TaskBoard = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {(currentUser?.role === "admin" || currentUser?.role === "manager") && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                       Assign To
                     </label>
                     <select
@@ -921,7 +970,7 @@ const TaskBoard = () => {
                       })}
                     </select>
 
-                    {/* Feature 5: Task Assignment Decision-Support User Card */}
+                    {/* Task Assignment Decision-Support User Card */}
                     {(() => {
                       const selectedUser = availableUsers.find(
                         (u) => u._id === formData.assignedTo
@@ -938,7 +987,7 @@ const TaskBoard = () => {
                           : selectedUser.taskStats?.completed ?? 0;
 
                       return (
-                        <div className="mt-2.5 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 text-xs space-y-2">
+                        <div className="mt-2.5 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 text-xs space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
                               {selectedUser.name || selectedUser.email}
@@ -956,9 +1005,7 @@ const TaskBoard = () => {
                               <a
                                 href={`mailto:${selectedUser.email}`}
                                 className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline transition-colors"
-                                title={`Send email to ${selectedUser.email}`}
                               >
-                                <span>📧</span>
                                 <span>{selectedUser.email}</span>
                               </a>
                             </div>
@@ -982,7 +1029,7 @@ const TaskBoard = () => {
                                 {selectedUser.skills.map((skill, i) => (
                                   <span
                                     key={i}
-                                    className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-medium"
+                                    className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 text-[10px] font-medium"
                                   >
                                     {skill}
                                   </span>
@@ -997,10 +1044,10 @@ const TaskBoard = () => {
                           <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
                             <div className="flex items-center gap-3 text-[11px]">
                               <span>
-                                <strong className="text-amber-700 dark:text-amber-400">Pending Tasks:</strong> {pendingCount}
+                                <strong className="text-amber-700 dark:text-amber-400">Pending:</strong> {pendingCount}
                               </span>
                               <span>
-                                <strong className="text-emerald-700 dark:text-emerald-400">Completed:</strong> {completedCount}
+                                <strong className="text-emerald-700 dark:text-emerald-400">Done:</strong> {completedCount}
                               </span>
                             </div>
                             <button
@@ -1010,9 +1057,9 @@ const TaskBoard = () => {
                                 setProfileModalUserObj(selectedUser);
                                 setIsProfileModalOpen(true);
                               }}
-                              className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 text-[11px] font-medium transition-colors shadow-2xs"
+                              className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 text-[11px] font-medium transition-colors"
                             >
-                              Profile Button →
+                              Profile View →
                             </button>
                           </div>
                         </div>
@@ -1028,7 +1075,7 @@ const TaskBoard = () => {
                       : "sm:col-span-2"
                   }
                 >
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                     Due Date
                   </label>
                   <input
@@ -1042,7 +1089,7 @@ const TaskBoard = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3">
+              <div className="flex items-center justify-end gap-2.5 pt-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -1054,14 +1101,14 @@ const TaskBoard = () => {
                       setSearchParams(selectedProjectId ? { project: selectedProjectId } : {});
                     }
                   }}
-                  className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium transition-colors"
+                  className="px-3.5 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-xs"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 shadow-xs"
                 >
                   {createLoading ? "Creating..." : "Create Task"}
                 </button>

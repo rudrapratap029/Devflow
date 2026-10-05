@@ -7,6 +7,14 @@ import User from "../models/user.model.js";
 // @access  Private
 export const createWorkspace = async (req, res, next) => {
   try {
+    // 1. Verify company authorization: Unverified company cannot create workspaces
+    if (req.user.role === "company" && req.user.verificationStatus !== "Approved") {
+      return res.status(403).json({
+        success: false,
+        message: "Your company account is pending administrative verification. You cannot create workspaces until an administrator approves your account."
+      });
+    }
+
     const { name, description } = req.body || {};
 
     // Validate required fields
@@ -42,8 +50,8 @@ export const createWorkspace = async (req, res, next) => {
 // @access  Private
 export const getWorkspaces = async (req, res, next) => {
   try {
-    // Return only workspaces where the logged-in user is a member
-    const workspaces = await Workspace.find({ members: req.user._id })
+    const filter = req.user.role?.toLowerCase() === "admin" ? {} : { members: req.user._id };
+    const workspaces = await Workspace.find(filter)
       .populate("owner", "name email avatar profilePicture")
       .populate("members", "name email avatar profilePicture")
       .sort({ createdAt: -1 });
@@ -86,12 +94,13 @@ export const getWorkspaceById = async (req, res, next) => {
       });
     }
 
-    // Check if logged-in user is a member of the workspace
+    // Check if logged-in user is a member of the workspace or admin
     const isMember = workspace.members.some(
       (member) => member._id.toString() === req.user._id.toString()
     );
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
 
-    if (!isMember) {
+    if (!isMember && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: "Access denied. You are not a member of this workspace"
@@ -134,11 +143,13 @@ export const updateWorkspace = async (req, res, next) => {
       });
     }
 
-    // Check if logged-in user is the owner
-    if (workspace.owner.toString() !== req.user._id.toString()) {
+    // Check if logged-in user is the owner or admin
+    const isOwner = workspace.owner.toString() === req.user._id.toString();
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only the workspace owner can update this workspace"
+        message: "Access denied. Only the workspace owner or admin can update this workspace"
       });
     }
 
@@ -200,11 +211,13 @@ export const deleteWorkspace = async (req, res, next) => {
       });
     }
 
-    // Check if logged-in user is the owner
-    if (workspace.owner.toString() !== req.user._id.toString()) {
+    // Check if logged-in user is the owner or admin
+    const isOwner = workspace.owner.toString() === req.user._id.toString();
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only the workspace owner can delete this workspace"
+        message: "Access denied. Only the workspace owner or admin can delete this workspace"
       });
     }
 
@@ -260,11 +273,13 @@ export const addMember = async (req, res, next) => {
       });
     }
 
-    // Check if logged-in user is the owner
-    if (workspace.owner.toString() !== req.user._id.toString()) {
+    // Check if logged-in user is the owner or admin
+    const isOwner = workspace.owner.toString() === req.user._id.toString();
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only the workspace owner can add members"
+        message: "Access denied. Only the workspace owner or admin can add members"
       });
     }
 
@@ -339,11 +354,13 @@ export const removeMember = async (req, res, next) => {
       });
     }
 
-    // Check if logged-in user is the owner
-    if (workspace.owner.toString() !== req.user._id.toString()) {
+    // Check if logged-in user is the owner or admin
+    const isOwner = workspace.owner.toString() === req.user._id.toString();
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only the workspace owner can remove members"
+        message: "Access denied. Only the workspace owner or admin can remove members"
       });
     }
 

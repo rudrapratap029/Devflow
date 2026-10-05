@@ -14,14 +14,21 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     localStorage.removeItem("user");
     localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("token");
   };
 
-  // Login handler: sets state and stores in localStorage
-  const login = (userData, token) => {
+  // Login handler: sets state and stores tokens in localStorage
+  const login = (userData, token, refreshToken) => {
     setUser(userData);
     setIsAuthenticated(true);
     localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("accessToken", token);
+    if (token && token !== "undefined" && token !== "null") {
+      localStorage.setItem("accessToken", token);
+    }
+    if (refreshToken && refreshToken !== "undefined" && refreshToken !== "null") {
+      localStorage.setItem("refreshToken", refreshToken);
+    }
   };
 
   // Logout handler: calls backend logout, clears localStorage and state
@@ -39,9 +46,15 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       const storedUser = localStorage.getItem("user");
-      const storedToken = localStorage.getItem("accessToken");
+      const storedToken =
+        localStorage.getItem("accessToken") || localStorage.getItem("token");
 
-      if (storedUser && storedToken) {
+      if (
+        storedUser &&
+        storedToken &&
+        storedToken !== "undefined" &&
+        storedToken !== "null"
+      ) {
         try {
           setUser(JSON.parse(storedUser));
           setIsAuthenticated(true);

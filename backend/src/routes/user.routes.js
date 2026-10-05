@@ -7,9 +7,10 @@ import {
   getProfilePicture,
   deleteProfilePicture,
   uploadProfilePictureMiddleware,
-  updateProfile
+  updateProfile,
+  verifyCompanyStatus
 } from "../controllers/user.controller.js";
-import { protect } from "../middleware/auth.middleware.js";
+import { protect, authorize } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
@@ -27,6 +28,9 @@ router.delete("/avatar", deleteProfilePicture);
 
 // User Listing Route (Accessible to all authenticated users for collaboration, task assignment, etc.)
 router.get("/", getUsers);
+
+// Admin-only Company Verification Route
+router.patch("/:id/verify-company", authorize("admin"), verifyCompanyStatus);
 
 // Specific User Profile & Profile Picture Visibility Routes (Accessible to all authenticated users)
 router.get("/:id", getUserById);

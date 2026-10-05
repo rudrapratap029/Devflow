@@ -15,29 +15,34 @@ const Navbar = ({ onToggleMobileMenu }) => {
   };
 
   return (
-    <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between shadow-xs">
+    <header className="h-16 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#0e131f]/95 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between transition-colors">
       {/* Left: Mobile Menu Toggle & DevFlow Logo */}
       <div className="flex items-center space-x-3">
         {onToggleMobileMenu && (
           <button
             onClick={onToggleMobileMenu}
-            className="md:hidden p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700"
+            className="md:hidden p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/80 transition-colors"
             aria-label="Toggle navigation menu"
           >
-            ☰
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" x2="20" y1="12" y2="12" />
+              <line x1="4" x2="20" y1="6" y2="6" />
+              <line x1="4" x2="20" y1="18" y2="18" />
+            </svg>
           </button>
         )}
         <Link
           to="/dashboard"
-          className="flex items-center gap-2.5 font-bold text-lg text-slate-900 dark:text-white hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2.5 font-bold text-base sm:text-lg text-slate-900 dark:text-white hover:opacity-90 transition-opacity"
         >
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
             D
           </div>
-          <span className="tracking-tight">DevFlow</span>
+          <span className="tracking-tight font-semibold">DevFlow</span>
         </Link>
-        <span className="hidden sm:inline-block text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-          v1.0
+        <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border border-slate-200/80 dark:border-slate-700/80">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          Workspace
         </span>
       </div>
 
@@ -47,10 +52,26 @@ const Navbar = ({ onToggleMobileMenu }) => {
         <button
           onClick={toggleTheme}
           title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors border border-slate-200 dark:border-slate-700 shadow-2xs"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 text-slate-600 dark:text-slate-300 text-xs font-medium transition-colors border border-slate-200/80 dark:border-slate-700/80"
           aria-label="Toggle dark mode"
         >
-          <span className="text-sm leading-none">{theme === "dark" ? "☀️" : "🌙"}</span>
+          {theme === "dark" ? (
+            <svg className="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="m4.93 4.93 1.41 1.41" />
+              <path d="m17.66 17.66 1.41 1.41" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="m6.34 17.66-1.41 1.41" />
+              <path d="m19.07 4.93-1.41 1.41" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+            </svg>
+          )}
           <span className="hidden md:inline font-medium">{theme === "dark" ? "Light" : "Dark"}</span>
         </button>
 
@@ -60,7 +81,7 @@ const Navbar = ({ onToggleMobileMenu }) => {
         {/* User Info */}
         <Link
           to="/profile"
-          className="hidden sm:flex items-center space-x-2.5 pl-2 border-l border-slate-200 dark:border-slate-700 hover:opacity-90 transition-opacity"
+          className="hidden sm:flex items-center space-x-2.5 pl-2.5 border-l border-slate-200/80 dark:border-slate-800/80 hover:opacity-90 transition-opacity"
           title="View Profile"
         >
           {user?.avatar ? (
@@ -70,7 +91,7 @@ const Navbar = ({ onToggleMobileMenu }) => {
               className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-2xs"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-semibold text-xs flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
+            <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-semibold text-xs flex items-center justify-center border border-indigo-200/80 dark:border-indigo-800/80">
               {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
             </div>
           )}
@@ -87,9 +108,15 @@ const Navbar = ({ onToggleMobileMenu }) => {
         {/* Logout Button */}
         <button
           onClick={handleLogout}
-          className="ml-1 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-900/50 text-xs sm:text-sm font-medium transition-colors"
+          className="flex items-center gap-1.5 ml-1 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200/80 dark:border-slate-700/80 hover:border-rose-200 dark:hover:border-rose-900/50 text-xs sm:text-sm font-medium transition-colors"
+          title="Sign out"
         >
-          Logout
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" x2="9" y1="12" y2="12" />
+          </svg>
+          <span className="hidden sm:inline">Logout</span>
         </button>
       </div>
     </header>

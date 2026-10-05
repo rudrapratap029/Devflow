@@ -28,8 +28,8 @@ const storage = multer.diskStorage({
   }
 });
 
-// Allowed file extensions (ZIP, PDF, DOCX, PNG, JPG, JPEG)
-const allowedExtensions = [".pdf", ".docx", ".png", ".jpg", ".jpeg", ".zip"];
+// Allowed file extensions (ZIP, PDF, DOCX, XLSX, XLS, PNG, JPG, JPEG)
+const allowedExtensions = [".pdf", ".docx", ".xlsx", ".xls", ".png", ".jpg", ".jpeg", ".zip"];
 
 // File filter validation
 const fileFilter = (req, file, cb) => {
@@ -38,7 +38,7 @@ const fileFilter = (req, file, cb) => {
     cb(null, true);
   } else {
     cb(
-      new Error("Unsupported file type. Only ZIP, PDF, DOCX, PNG, JPG, and JPEG are allowed."),
+      new Error("Unsupported file type. Only PDF, DOCX, Excel (.xlsx), ZIP, PNG, JPG, and JPEG are allowed."),
       false
     );
   }

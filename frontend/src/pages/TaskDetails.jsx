@@ -111,33 +111,22 @@ const TaskDetails = () => {
     }
   };
 
-  // Handle Assignee Update (Admin/Manager)
+  // Handle Assignee Change (Admin/Manager)
   const handleAssigneeChange = async (newAssigneeId) => {
     try {
       setAssigneeUpdating(true);
-      if (newAssigneeId && task?.project) {
-        const projId = task.project._id || task.project;
-        const wsId = task.workspace?._id || task.workspace;
-        if (wsId) {
-          await API.post(`/workspaces/${wsId}/members`, { userId: newAssigneeId }).catch(() => {});
-        }
-        if (projId) {
-          await API.post(`/projects/${projId}/members`, { userId: newAssigneeId }).catch(() => {});
-        }
-      }
-
       const res = await API.put(`/tasks/${taskId}`, {
         assignedTo: newAssigneeId || null
       });
       if (res.data?.success) {
-        const found = availableUsers.find((u) => u._id === newAssigneeId);
+        const assignedObj = availableUsers.find((u) => u._id === newAssigneeId);
         setTask((prev) => ({
           ...prev,
-          assignedTo: found || (newAssigneeId ? { _id: newAssigneeId, name: "Assigned User" } : null)
+          assignedTo: assignedObj || (newAssigneeId ? { _id: newAssigneeId } : null)
         }));
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update assigned user");
+      alert(err.response?.data?.message || "Failed to update assignee");
     } finally {
       setAssigneeUpdating(false);
     }
@@ -151,17 +140,21 @@ const TaskDetails = () => {
     try {
       setCommentLoading(true);
       setCommentError("");
+
       const res = await API.post(`/tasks/${taskId}/comments`, {
         text: commentText.trim()
       });
+
       if (res.data?.success) {
         setCommentText("");
         // Refresh comments list
-        const refreshed = await API.get(`/tasks/${taskId}/comments`);
-        setComments(refreshed.data?.data?.comments || []);
+        const commentsRes = await API.get(`/tasks/${taskId}/comments`);
+        setComments(commentsRes.data?.data?.comments || []);
       }
     } catch (err) {
-      setCommentError(err.response?.data?.message || "Failed to post comment");
+      setCommentError(
+        err.response?.data?.message || "Failed to post comment"
+      );
     } finally {
       setCommentLoading(false);
     }
@@ -172,7 +165,7 @@ const TaskDetails = () => {
     if (!window.confirm("Are you sure you want to delete this comment?")) return;
 
     try {
-      const res = await API.delete(`/comments/${commentId}`);
+      const res = await API.delete(`/tasks/${taskId}/comments/${commentId}`);
       if (res.data?.success) {
         setComments((prev) => prev.filter((c) => c._id !== commentId));
       }
@@ -181,21 +174,10 @@ const TaskDetails = () => {
     }
   };
 
-  // Handle File Upload Attachment
+  // Handle Upload Attachment
   const handleUploadAttachment = async (e) => {
     e.preventDefault();
-    if (!selectedFile) {
-      setAttachmentError("Please select a file to upload");
-      return;
-    }
-
-    // Supported formats validation matching backend
-    const allowedExtensions = [".pdf", ".docx", ".png", ".jpg", ".jpeg"];
-    const fileExt = "." + selectedFile.name.split(".").pop().toLowerCase();
-    if (!allowedExtensions.includes(fileExt)) {
-      setAttachmentError("Invalid file. Only PDF, DOCX, PNG, JPG, and JPEG are allowed.");
-      return;
-    }
+    if (!selectedFile) return;
 
     // 5 MB file size limit
     if (selectedFile.size > 5 * 1024 * 1024) {
@@ -267,9 +249,9 @@ const TaskDetails = () => {
         </div>
         <Link
           to="/task-board"
-          className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline inline-block"
+          className="text-xs sm:text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1.5"
         >
-          ← Back to Task Board
+          <span>← Back to Task Board</span>
         </Link>
       </div>
     );
@@ -283,15 +265,19 @@ const TaskDetails = () => {
           to={`/task-board?project=${task.project?._id || ""}`}
           className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1.5 transition-colors"
         >
-          ← Back to Task Board ({task.project?.name || "Project"})
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" x2="5" y1="12" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          <span>Back to Task Board ({task.project?.name || "Project"})</span>
         </Link>
       </div>
 
       {/* Main Task Header & Details */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 sm:p-7 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-700">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 sm:p-7 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
               {task.project?.name || "Project Task"}
             </span>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-2">
@@ -307,7 +293,7 @@ const TaskDetails = () => {
               disabled={statusUpdating}
               value={task.status}
               onChange={(e) => handleStatusChange(e.target.value)}
-              className="text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+              className="text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
             >
               <option value="Todo">Todo</option>
               <option value="In Progress">In Progress</option>
@@ -321,7 +307,7 @@ const TaskDetails = () => {
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
             Description
           </h2>
-          <div className="text-slate-700 dark:text-slate-300 text-sm sm:text-base leading-relaxed whitespace-pre-line bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          <div className="text-slate-700 dark:text-slate-300 text-xs sm:text-sm leading-relaxed whitespace-pre-line bg-slate-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             {task.description || "No description provided for this task."}
           </div>
         </div>
@@ -329,13 +315,13 @@ const TaskDetails = () => {
         {/* Task Metadata Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           {/* Priority */}
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          <div className="bg-slate-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Priority
             </p>
-            <div className="mt-1.5">
+            <div className="mt-2">
               <span
-                className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
                   task.priority === "High"
                     ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/50"
                     : task.priority === "Medium"
@@ -343,13 +329,16 @@ const TaskDetails = () => {
                     : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600"
                 }`}
               >
-                ● {task.priority || "Medium"}
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  task.priority === "High" ? "bg-rose-500" : task.priority === "Medium" ? "bg-amber-500" : "bg-slate-400"
+                }`}></span>
+                {task.priority || "Medium"}
               </span>
             </div>
           </div>
 
           {/* Assigned User */}
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          <div className="bg-slate-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Assigned To
             </p>
@@ -359,7 +348,7 @@ const TaskDetails = () => {
                   disabled={assigneeUpdating}
                   value={task.assignedTo?._id || task.assignedTo || ""}
                   onChange={(e) => handleAssigneeChange(e.target.value)}
-                  className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs mt-1"
+                  className="w-full text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs mt-1"
                 >
                   <option value="">Unassigned</option>
                   {availableUsers.map((u) => {
@@ -428,7 +417,7 @@ const TaskDetails = () => {
                         {assignedUser.skills.map((skill, i) => (
                           <span
                             key={i}
-                            className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-medium"
+                            className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-medium"
                           >
                             {skill}
                           </span>
@@ -456,9 +445,9 @@ const TaskDetails = () => {
                         setProfileModalUserObj(assignedUser);
                         setIsProfileModalOpen(true);
                       }}
-                      className="px-2 py-1 rounded-md bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 text-[11px] font-medium transition-colors shadow-2xs"
+                      className="px-2 py-1 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 text-[11px] font-medium transition-colors"
                     >
-                      View Profile →
+                      Profile View →
                     </button>
                   </div>
                 </div>
@@ -467,31 +456,39 @@ const TaskDetails = () => {
           </div>
 
           {/* Due Date */}
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          <div className="bg-slate-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Due Date
             </p>
-            <p className="text-sm font-medium text-slate-900 dark:text-white mt-1.5">
-              {task.dueDate
-                ? new Date(task.dueDate).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric"
-                  })
-                : "No due date"}
+            <p className="text-sm font-medium text-slate-900 dark:text-white mt-2 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                <line x1="16" x2="16" y1="2" y2="6" />
+                <line x1="8" x2="8" y1="2" y2="6" />
+                <line x1="3" x2="21" y1="10" y2="10" />
+              </svg>
+              <span>
+                {task.dueDate
+                  ? new Date(task.dueDate).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric"
+                    })
+                  : "No due date set"}
+              </span>
             </p>
           </div>
         </div>
       </div>
 
       {/* Comments Section */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 sm:p-7 shadow-xs space-y-6">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 sm:p-7 shadow-xs space-y-6">
         <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-          Comments ({comments.length})
+          Discussion & Comments ({comments.length})
         </h2>
 
         {commentError && (
-          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-sm">
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs sm:text-sm">
             {commentError}
           </div>
         )}
@@ -502,9 +499,9 @@ const TaskDetails = () => {
             rows={3}
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Write a comment..."
+            placeholder="Write a comment or project update..."
             required
-            className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+            className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
           />
           <div className="flex justify-end">
             <button
@@ -531,11 +528,11 @@ const TaskDetails = () => {
               return (
                 <div
                   key={comment._id}
-                  className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-2"
+                  className="bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 rounded-xl p-4 space-y-2"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2.5">
-                      <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center font-bold text-xs">
+                      <div className="w-6 h-6 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center font-bold text-xs">
                         {comment.user?.name ? comment.user.name.charAt(0).toUpperCase() : "U"}
                       </div>
                       <span className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
@@ -564,7 +561,7 @@ const TaskDetails = () => {
                       </button>
                     )}
                   </div>
-                  <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap pl-8">
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap pl-8">
                     {comment.text}
                   </p>
                 </div>
@@ -575,19 +572,19 @@ const TaskDetails = () => {
       </div>
 
       {/* Attachments Section */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 sm:p-7 shadow-xs space-y-6">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 sm:p-7 shadow-xs space-y-6">
         <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
           Attachments ({attachments.length})
         </h2>
 
         {attachmentSuccess && (
-          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-sm">
+          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm">
             {attachmentSuccess}
           </div>
         )}
 
         {attachmentError && (
-          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-sm">
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs sm:text-sm">
             {attachmentError}
           </div>
         )}
@@ -606,7 +603,7 @@ const TaskDetails = () => {
               setAttachmentError("");
               setAttachmentSuccess("");
             }}
-            className="flex-1 text-xs text-slate-600 dark:text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200 hover:file:bg-slate-200 dark:hover:file:bg-slate-600 cursor-pointer"
+            className="flex-1 text-xs text-slate-600 dark:text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-100 dark:file:bg-slate-800 file:text-slate-700 dark:file:text-slate-200 hover:file:bg-slate-200 dark:hover:file:bg-slate-700 cursor-pointer"
           />
           <button
             type="submit"
@@ -641,7 +638,6 @@ const TaskDetails = () => {
                 const ext = (file.originalName || "").split(".").pop().toLowerCase();
                 const isImg = ["png", "jpg", "jpeg"].includes(ext) || file.fileType?.startsWith("image/");
                 const isDoc = ["pdf", "docx", "doc"].includes(ext) || file.fileType?.includes("pdf") || file.fileType?.includes("word");
-                const fileIcon = isImg ? "🖼" : isDoc ? "📄" : "📎";
 
                 const fileSizeFormatted = file.fileSize
                   ? `${(file.fileSize / 1024).toFixed(1)} KB`
@@ -668,12 +664,29 @@ const TaskDetails = () => {
                 return (
                   <div
                     key={file._id}
-                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                   >
-                    <div className="flex items-center space-x-3 truncate">
-                      <span className="text-lg">{fileIcon}</span>
+                    <div className="flex items-center space-x-3 truncate mr-2">
+                      <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700">
+                        {isImg ? (
+                          <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                            <circle cx="9" cy="9" r="2" />
+                            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                          </svg>
+                        ) : isDoc ? (
+                          <svg className="w-4 h-4 text-sky-600 dark:text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 text-slate-500 dark:text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                          </svg>
+                        )}
+                      </div>
                       <div className="truncate">
-                        <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                        <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white truncate">
                           {file.originalName || "File"}
                         </p>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">

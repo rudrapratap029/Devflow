@@ -273,16 +273,16 @@ const Profile = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Page Title */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">User Profile</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">User Profile</h1>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Manage and review your DevFlow account details
+          Manage personal credentials, technical expertise, and workspace preferences
         </p>
       </div>
 
       {/* Profile Card */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 sm:p-8 shadow-xs space-y-6">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 sm:p-8 shadow-xs space-y-6">
         {/* Top Profile Header: Avatar & Info */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 pb-6 border-b border-slate-100 dark:border-slate-700">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
           {/* Avatar display & actions */}
           <div className="flex flex-col items-center sm:items-start space-y-2.5 shrink-0">
             <div className="relative">
@@ -290,16 +290,16 @@ const Profile = () => {
                 <img
                   src={previewUrl}
                   alt="Avatar Preview"
-                  className="w-24 h-24 rounded-full object-cover border-2 border-indigo-500 shadow-sm"
+                  className="w-20 h-20 rounded-full object-cover border-2 border-indigo-500 shadow-sm"
                 />
               ) : user?.avatar ? (
                 <img
                   src={getAvatarUrl(user.avatar)}
                   alt={user.name || "User Avatar"}
-                  className="w-24 h-24 rounded-full object-cover border-2 border-indigo-200 dark:border-indigo-800 shadow-sm"
+                  className="w-20 h-20 rounded-full object-cover border-2 border-indigo-200 dark:border-indigo-800 shadow-sm"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-3xl font-bold border-2 border-indigo-200 dark:border-indigo-800 shadow-sm">
+                <div className="w-20 h-20 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-2xl font-bold border-2 border-indigo-200 dark:border-indigo-800 shadow-sm">
                   {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
                 </div>
               )}
@@ -335,7 +335,7 @@ const Profile = () => {
                   type="button"
                   onClick={handleCancelPreview}
                   disabled={uploading}
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors"
                 >
                   Cancel
                 </button>
@@ -345,7 +345,7 @@ const Profile = () => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-200 dark:border-slate-600 shadow-2xs"
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-200/80 dark:border-slate-700/80"
                 >
                   {user?.avatar ? "Change Photo" : "Upload Photo"}
                 </button>
@@ -368,24 +368,27 @@ const Profile = () => {
           </div>
 
           {/* User Basic Info */}
-          <div className="text-center sm:text-left space-y-1 sm:pt-2 flex-1">
+          <div className="text-center sm:text-left space-y-1 sm:pt-1 flex-1">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
               {user?.name || "Developer"}
             </h2>
             {user?.email ? (
               <a
                 href={`mailto:${user.email}`}
-                className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition-colors"
                 title={`Send email to ${user.email}`}
               >
-                <span>📧</span>
+                <svg className="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
                 <span>{user.email}</span>
               </a>
             ) : (
               <p className="text-sm text-slate-500 dark:text-slate-400">No email</p>
             )}
             <div className="pt-2">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                 {user?.role || "Developer"}
               </span>
             </div>
@@ -415,7 +418,7 @@ const Profile = () => {
 
         {/* Detailed Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          <div className="bg-slate-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Full Name
             </p>
@@ -424,7 +427,7 @@ const Profile = () => {
             </p>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          <div className="bg-slate-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Email Address
             </p>
@@ -433,7 +436,7 @@ const Profile = () => {
             </p>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          <div className="bg-slate-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Account Role
             </p>
@@ -442,7 +445,7 @@ const Profile = () => {
             </p>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          <div className="bg-slate-50/70 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Account Status
             </p>
@@ -454,21 +457,21 @@ const Profile = () => {
         </div>
 
         {/* Professional Bio Section */}
-        <div className="pt-6 border-t border-slate-100 dark:border-slate-700 space-y-3">
+        <div className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>Professional Bio</span>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                Professional Bio
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Describe your technical focus, interests, and preferred work to help Admin and Managers assign suitable tasks
+                Describe your technical focus and interests to help teams assign suitable tasks
               </p>
             </div>
             <button
               type="button"
               onClick={handleSaveBio}
               disabled={savingBio}
-              className="self-start sm:self-auto px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+              className="self-start sm:self-auto px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors shadow-xs disabled:opacity-50"
             >
               {savingBio ? "Saving..." : "Save Bio"}
             </button>
@@ -489,7 +492,7 @@ const Profile = () => {
               }}
               maxLength={500}
               rows={3}
-              placeholder="e.g. I enjoy building scalable backend APIs with Node.js and MongoDB. Interested in performance optimization and clean REST architectures..."
+              placeholder="e.g. Full-stack developer focused on React and Node.js architectures..."
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 text-slate-900 dark:text-white text-xs sm:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-2xs resize-none"
             />
             <div className="flex justify-end mt-1">
@@ -507,24 +510,24 @@ const Profile = () => {
         </div>
 
         {/* Skills Management Section */}
-        <div className="pt-6 border-t border-slate-100 dark:border-slate-700 space-y-4">
+        <div className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>Skills</span>
+                <span>Technical Skills</span>
                 <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
                   ({skills.length} added)
                 </span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Add, edit, or remove professional skills to help Admin and Managers assign relevant tasks
+                Add, edit, or remove technical skills for task matching
               </p>
             </div>
             <button
               type="button"
               onClick={handleSaveSkills}
               disabled={savingSkills}
-              className="self-start sm:self-auto px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+              className="self-start sm:self-auto px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors shadow-xs disabled:opacity-50"
             >
               {savingSkills ? "Saving..." : "Save Skills"}
             </button>
@@ -545,7 +548,7 @@ const Profile = () => {
           )}
 
           {/* Skills Badges List */}
-          <div className="flex flex-wrap items-center gap-2 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 min-h-[52px]">
+          <div className="flex flex-wrap items-center gap-2 p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 min-h-[52px]">
             {skills.length === 0 ? (
               <span className="text-xs text-slate-400 dark:text-slate-500 italic">
                 No skills added yet. Add your professional skills below.
@@ -602,7 +605,7 @@ const Profile = () => {
                 return (
                   <span
                     key={index}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-2xs group"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-white dark:bg-slate-850 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 shadow-2xs group"
                   >
                     <span>{skill}</span>
                     <button
@@ -611,7 +614,9 @@ const Profile = () => {
                       className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors ml-0.5"
                       title="Edit skill"
                     >
-                      ✎
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                      </svg>
                     </button>
                     <button
                       type="button"
@@ -641,7 +646,7 @@ const Profile = () => {
             />
             <button
               type="submit"
-              className="px-3.5 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-medium transition-colors border border-slate-200 dark:border-slate-600 shadow-2xs whitespace-nowrap"
+              className="px-3.5 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-medium transition-colors border border-slate-200/80 dark:border-slate-700/80 whitespace-nowrap"
             >
               + Add Skill
             </button>
@@ -649,7 +654,7 @@ const Profile = () => {
         </div>
 
         {/* Theme Preference Section */}
-        <div className="pt-6 border-t border-slate-100 dark:border-slate-700">
+        <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
             Interface Theme
           </p>
@@ -660,11 +665,23 @@ const Profile = () => {
               className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left ${
                 theme === "light"
                   ? "bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500 text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20"
-                  : "bg-slate-50 dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600"
+                  : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
               <div className="flex items-center space-x-3">
-                <span className="text-xl">☀️</span>
+                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2" />
+                    <path d="M12 20v2" />
+                    <path d="m4.93 4.93 1.41 1.41" />
+                    <path d="m17.66 17.66 1.41 1.41" />
+                    <path d="M2 12h2" />
+                    <path d="M20 12h2" />
+                    <path d="m6.34 17.66-1.41 1.41" />
+                    <path d="m19.07 4.93-1.41 1.41" />
+                  </svg>
+                </div>
                 <div>
                   <p className="text-sm font-semibold">Light Mode</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Clean white and slate surfaces</p>
@@ -681,14 +698,18 @@ const Profile = () => {
               className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left ${
                 theme === "dark"
                   ? "bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500 text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20"
-                  : "bg-slate-50 dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600"
+                  : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
               <div className="flex items-center space-x-3">
-                <span className="text-xl">🌙</span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-400 flex items-center justify-center">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                  </svg>
+                </div>
                 <div>
                   <p className="text-sm font-semibold">Dark Mode</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Easy on the eyes in low light</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Refined dark theme for low light</p>
                 </div>
               </div>
               {theme === "dark" && (

@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "manager", "developer"],
+      enum: ["admin", "company", "developer", "manager"],
       default: "developer"
     },
     avatar: {
@@ -48,6 +48,35 @@ const userSchema = new mongoose.Schema(
       default: "",
       trim: true,
       maxLength: [500, "Bio cannot exceed 500 characters"]
+    },
+    companyName: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    companyWebsite: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    companyDescription: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    industry: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    companyLogo: {
+      type: String,
+      default: ""
+    },
+    verificationStatus: {
+      type: String,
+      enum: ["Pending", "Approved", "Rejected"],
+      default: "Approved"
     },
     refreshToken: {
       type: String,

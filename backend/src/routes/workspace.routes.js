@@ -15,15 +15,15 @@ const router = Router();
 // Protect all workspace routes with authentication middleware
 router.use(protect);
 
-// Workspace CRUD routes (Admin only for create, update, delete)
-router.route("/").post(authorize("admin"), createWorkspace).get(getWorkspaces);
+// Workspace CRUD routes (Admin and Company can create, update, delete own workspaces)
+router.route("/").post(authorize("admin", "company"), createWorkspace).get(getWorkspaces);
 router.route("/:id")
   .get(getWorkspaceById)
-  .put(authorize("admin"), updateWorkspace)
-  .delete(authorize("admin"), deleteWorkspace);
+  .put(authorize("admin", "company"), updateWorkspace)
+  .delete(authorize("admin", "company"), deleteWorkspace);
 
-// Member management routes (Admin only)
-router.post("/:id/members", authorize("admin"), addMember);
-router.delete("/:id/members/:userId", authorize("admin"), removeMember);
+// Member management routes (Admin and Workspace Owner Company)
+router.post("/:id/members", authorize("admin", "company"), addMember);
+router.delete("/:id/members/:userId", authorize("admin", "company"), removeMember);
 
 export default router;

@@ -6,7 +6,11 @@ import {
   updateProject,
   deleteProject,
   addProjectMember,
-  removeProjectMember
+  removeProjectMember,
+  getProjectSummary,
+  submitProject,
+  reviewProjectWithAI,
+  respondToProject
 } from "../controllers/project.controller.js";
 import { getProjectActivityLogs } from "../controllers/activity.controller.js";
 import { protect, authorize } from "../middleware/auth.middleware.js";
@@ -16,16 +20,28 @@ const router = Router();
 // Protect all project routes
 router.use(protect);
 
-// Project CRUD routes (Admin and Manager only for create, update, delete)
-router.route("/").post(authorize("admin", "manager"), createProject).get(getProjects);
+// Project summary route (Admin, Manager, and Company)
+router.post("/:projectId/summary", authorize("admin", "manager", "company"), getProjectSummary);
+
+// Developer project response route (Accept, Reject, Pending, In Progress)
+router.post("/:projectId/respond", respondToProject);
+
+// Project submission route (Developer, Member, Owner, Admin)
+router.post("/:projectId/submit", submitProject);
+
+// AI Project Analysis / Review route (Company, Admin, Manager)
+router.post("/:projectId/ai-review", authorize("admin", "manager", "company"), reviewProjectWithAI);
+
+// Project CRUD routes (Admin, Manager, and Company can create and delete projects)
+router.route("/").post(authorize("admin", "manager", "company"), createProject).get(getProjects);
 router.route("/:projectId")
   .get(getProjectById)
   .put(updateProject)
-  .delete(authorize("admin", "manager"), deleteProject);
+  .delete(authorize("admin", "manager", "company"), deleteProject);
 
-// Project member management routes (Admin and Manager only)
-router.post("/:projectId/members", authorize("admin", "manager"), addProjectMember);
-router.delete("/:projectId/members/:userId", authorize("admin", "manager"), removeProjectMember);
+// Project member management routes (Admin, Manager, and Company owner)
+router.post("/:projectId/members", authorize("admin", "manager", "company"), addProjectMember);
+router.delete("/:projectId/members/:userId", authorize("admin", "manager", "company"), removeProjectMember);
 
 // Activity logs route
 router.get("/:projectId/activity", getProjectActivityLogs);

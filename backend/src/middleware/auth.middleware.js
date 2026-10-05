@@ -23,9 +23,12 @@ export const protect = async (req, res, next) => {
       token = req.cookies.accessToken;
     }
 
-    // Strip accidental quotes if user pasted token with quotes
+    // Strip accidental quotes or handle invalid token strings ("undefined" / "null")
     if (token) {
       token = token.replace(/^["']|["']$/g, "").trim();
+      if (token === "undefined" || token === "null" || token === "") {
+        token = null;
+      }
     }
 
     // If no token could be found, return 401 Unauthorized
@@ -76,7 +79,9 @@ export const protect = async (req, res, next) => {
 // Reusable role-based authorization middleware
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    const userRole = (req.user?.role || "").toLowerCase();
+    const allowedRoles = roles.map((r) => String(r).toLowerCase());
+    if (!req.user || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to perform this action"

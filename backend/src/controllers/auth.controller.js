@@ -7,16 +7,35 @@ import {
 
 // @desc    Register a new user
 // @route   POST /api/v1/auth/register
+// @desc    Register a new user
+// @route   POST /api/v1/auth/register
 // @access  Public
 export const register = async (req, res, next) => {
   try {
-    const { name, email, password, role, avatar } = req.body || {};
+    const {
+      name,
+      companyName,
+      email,
+      password,
+      role,
+      avatar,
+      companyWebsite,
+      website,
+      companyDescription,
+      industry,
+      companyLogo
+    } = req.body || {};
+
+    const isCompany = role && role.toLowerCase() === "company";
+    const displayName = isCompany ? (companyName || name) : name;
 
     // Validate required fields
-    if (!name || !email || !password) {
+    if (!displayName || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Please provide name, email, and password"
+        message: isCompany
+          ? "Please provide company name, official company email, and password"
+          : "Please provide name, email, and password"
       });
     }
 
@@ -49,23 +68,33 @@ export const register = async (req, res, next) => {
     }
 
     // Validate role if provided
-    const validRoles = ["admin", "manager", "developer"];
+    const validRoles = ["admin", "company", "developer", "manager"];
     const userRole = role && validRoles.includes(role.toLowerCase())
       ? role.toLowerCase()
       : "developer";
 
     // Create user (password hashing is handled in User pre-save hook)
+    // Note: Companies start with "Pending" verification status until verified by Admin
     const user = await User.create({
-      name: name.trim(),
+      name: displayName.trim(),
       email: normalizedEmail,
       password,
       role: userRole,
-      avatar: avatar || ""
+      avatar: companyLogo || avatar || "",
+      profilePicture: companyLogo || avatar || "",
+      companyName: isCompany ? (companyName || displayName).trim() : "",
+      companyWebsite: (companyWebsite || website || "").trim(),
+      companyDescription: (companyDescription || "").trim(),
+      industry: (industry || "").trim(),
+      companyLogo: (companyLogo || avatar || "").trim(),
+      verificationStatus: isCompany ? "Pending" : "Approved"
     });
 
     return res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message: isCompany
+        ? "Company registered successfully. Account is pending admin verification."
+        : "User registered successfully",
       data: {
         user: {
           _id: user._id,
@@ -76,6 +105,12 @@ export const register = async (req, res, next) => {
           profilePicture: user.profilePicture || user.avatar || "",
           skills: user.skills || [],
           bio: user.bio || "",
+          companyName: user.companyName,
+          companyWebsite: user.companyWebsite,
+          companyDescription: user.companyDescription,
+          industry: user.industry,
+          companyLogo: user.companyLogo,
+          verificationStatus: user.verificationStatus,
           isActive: user.isActive,
           createdAt: user.createdAt
         }
@@ -91,7 +126,8 @@ export const register = async (req, res, next) => {
 // @access  Public
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body || {};
+    const { email, password, role, selectedRole } = req.body || {};
+    const attemptedRole = role || selectedRole;
 
     // Validate input fields
     if (!email || !password) {
@@ -138,6 +174,14 @@ export const login = async (req, res, next) => {
       });
     }
 
+    // Validate selected role against actual database role (Do not trust client alone)
+    if (attemptedRole && user.role.toLowerCase() !== attemptedRole.trim().toLowerCase()) {
+      return res.status(403).json({
+        success: false,
+        message: `Role mismatch: Your account is registered as '${user.role}', but you selected '${attemptedRole}'. Please log in with the correct role.`
+      });
+    }
+
     // Generate Access and Refresh Tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -177,6 +221,12 @@ export const login = async (req, res, next) => {
           profilePicture: user.profilePicture || user.avatar || "",
           skills: user.skills || [],
           bio: user.bio || "",
+          companyName: user.companyName || "",
+          companyWebsite: user.companyWebsite || "",
+          companyDescription: user.companyDescription || "",
+          industry: user.industry || "",
+          companyLogo: user.companyLogo || "",
+          verificationStatus: user.verificationStatus || "Approved",
           isActive: user.isActive
         }
       }

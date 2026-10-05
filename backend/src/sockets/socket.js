@@ -73,7 +73,8 @@ export const emitNotification = (recipientId, notification) => {
     _id: notification._id,
     type: notification.type,
     message: notification.message,
-    task: notification.task?._id || notification.task,
+    task: notification.task?._id || notification.task || null,
+    project: notification.project?._id || notification.project || null,
     sender: notification.sender?._id || notification.sender,
     isRead: notification.isRead ?? false,
     createdAt: notification.createdAt || new Date().toISOString()

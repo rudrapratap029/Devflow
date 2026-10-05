@@ -7,6 +7,8 @@ import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import Workspace from "../models/workspace.model.js";
 import Project from "../models/project.model.js";
+import Notification from "../models/notification.model.js";
+import { emitNotification } from "../sockets/socket.js";
 
 // Uploads directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -510,6 +512,80 @@ export const getUserProfilePictureById = async (req, res, next) => {
         profilePicture: pic,
         avatar: pic,
         user
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify or reject a company account (Admin only)
+// @route   PATCH /api/v1/users/:id/verify-company
+// @access  Private (Admin only)
+export const verifyCompanyStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+
+    if (!status || !["Approved", "Rejected", "Pending"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be either 'Approved', 'Rejected', or 'Pending'"
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID"
+      });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    if (user.role !== "company") {
+      return res.status(400).json({
+        success: false,
+        message: "Only company accounts can be verified or rejected"
+      });
+    }
+
+    user.verificationStatus = status;
+    await user.save();
+
+    // Send notification to company
+    try {
+      const notif = await Notification.create({
+        recipient: user._id,
+        sender: req.user._id,
+        type: "COMPANY_VERIFIED",
+        message: `Your company verification status has been updated to: ${status}`,
+        task: null,
+        project: null
+      });
+      emitNotification(user._id, notif);
+    } catch (notifErr) {
+      console.warn("Failed to emit company verification notification:", notifErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Company account status successfully updated to ${status}`,
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          companyName: user.companyName,
+          verificationStatus: user.verificationStatus
+        }
       }
     });
   } catch (error) {

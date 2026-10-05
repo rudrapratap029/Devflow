@@ -13,11 +13,11 @@ const router = Router();
 // Protect all task routes
 router.use(protect);
 
-// Task CRUD routes
-router.route("/").post(authorize("admin", "manager"), createTask).get(getTasks);
+// Task CRUD routes (Admin, Manager, and Company owner)
+router.route("/").post(authorize("admin", "manager", "company"), createTask).get(getTasks);
 router.route("/:taskId")
   .get(getTaskById)
   .put(updateTask)
-  .delete(authorize("admin", "manager"), deleteTask);
+  .delete(authorize("admin", "manager", "company"), deleteTask);
 
 export default router;

@@ -14,7 +14,15 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["TASK_ASSIGNED", "COMMENT_ADDED", "TASK_STATUS_CHANGED"],
+      enum: [
+        "TASK_ASSIGNED",
+        "COMMENT_ADDED",
+        "TASK_STATUS_CHANGED",
+        "NEW_PROJECT_AVAILABLE",
+        "PROJECT_SUBMITTED",
+        "PROJECT_REVIEWED",
+        "COMPANY_VERIFIED"
+      ],
       required: [true, "Notification type is required"]
     },
     message: {
@@ -25,7 +33,12 @@ const notificationSchema = new mongoose.Schema(
     task: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Task",
-      required: [true, "Task reference is required"]
+      default: null
+    },
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      default: null
     },
     isRead: {
       type: Boolean,
