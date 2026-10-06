@@ -64,7 +64,59 @@ const taskSchema = new mongoose.Schema(
     completedAt: {
       type: Date,
       default: null
-    }
+    },
+    // Developer Work Submission Details
+    submissionFiles: [
+      {
+        name: { type: String, required: true },
+        url: { type: String, required: true },
+        fileType: { type: String, default: "" },
+        size: { type: Number, default: 0 },
+        uploadedAt: { type: Date, default: Date.now }
+      }
+    ],
+    githubUrl: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    liveUrl: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    developerNotes: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    reviewStatus: {
+      type: String,
+      enum: ["Pending", "Under Review", "Approved", "Changes Requested"],
+      default: "Pending"
+    },
+    aiReviewResult: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
+    },
+    submissionHistory: [
+      {
+        submissionFiles: [
+          {
+            name: { type: String },
+            url: { type: String },
+            fileType: { type: String },
+            size: { type: Number },
+            uploadedAt: { type: Date, default: Date.now }
+          }
+        ],
+        githubUrl: { type: String, default: "" },
+        liveUrl: { type: String, default: "" },
+        developerNotes: { type: String, default: "" },
+        submittedAt: { type: Date, default: Date.now },
+        aiReviewResult: { type: mongoose.Schema.Types.Mixed, default: null }
+      }
+    ]
   },
   {
     timestamps: true

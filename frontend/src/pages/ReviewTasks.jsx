@@ -3,6 +3,10 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 
+const BACKEND_BASE_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1"
+).replace(/\/api\/v1\/?$/, "");
+
 const ReviewTasks = () => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -23,6 +27,10 @@ const ReviewTasks = () => {
     acceptanceMet: true,
     qualityChecked: true
   });
+
+  // AI Review state
+  const [aiReviewLoading, setAiReviewLoading] = useState(false);
+  const [aiReviewError, setAiReviewError] = useState("");
 
   // Fetch Projects for filtering
   useEffect(() => {
@@ -164,11 +172,42 @@ const ReviewTasks = () => {
   // Open Verify Modal
   const openVerifyModal = (task) => {
     setVerifyTask(task);
+    setAiReviewError("");
     setChecklist({
       codeReviewed: true,
       acceptanceMet: true,
       qualityChecked: true
     });
+  };
+
+  // Run AI Review using Groq API
+  const handleRunAiReview = async (taskId) => {
+    try {
+      setAiReviewLoading(true);
+      setAiReviewError("");
+      const res = await API.post(`/tasks/${taskId}/ai-review`);
+      if (res.data?.success) {
+        const { aiReviewResult, task: updatedTask } = res.data.data || {};
+        const merged = updatedTask || { ...verifyTask, aiReviewResult };
+        setVerifyTask(merged);
+        setTasks((prev) =>
+          prev.map((t) => (t._id === taskId ? { ...t, ...merged } : t))
+        );
+      }
+    } catch (err) {
+      setAiReviewError(
+        err.response?.data?.message || "Failed to generate AI verification review"
+      );
+    } finally {
+      setAiReviewLoading(false);
+    }
+  };
+
+  const getSubmissionFileUrl = (file) => {
+    if (!file?.url) return "#";
+    return file.url.startsWith("http")
+      ? file.url
+      : `${BACKEND_BASE_URL}${file.url.startsWith("/") ? "" : "/"}${file.url}`;
   };
 
   // Filter tasks based on activeTab, project, and search query
@@ -408,6 +447,32 @@ const ReviewTasks = () => {
                     {t.description}
                   </p>
                 )}
+
+                {/* Developer Deliverables Chips */}
+                {(t.submissionFiles?.length > 0 || t.githubUrl || t.liveUrl || t.aiReviewResult) && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {t.submissionFiles?.length > 0 && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                        <span>📎 {t.submissionFiles.length} file{t.submissionFiles.length > 1 ? "s" : ""}</span>
+                      </span>
+                    )}
+                    {t.githubUrl && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                        <span>GitHub</span>
+                      </span>
+                    )}
+                    {t.liveUrl && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-1">
+                        <span>Live Demo</span>
+                      </span>
+                    )}
+                    {t.aiReviewResult && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
+                        <span>🤖 AI: {t.aiReviewResult.score || `${t.aiReviewResult.completionScore}%`}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Developer Info & Timestamps */}
@@ -507,12 +572,12 @@ const ReviewTasks = () => {
       {/* Verify Task Modal */}
       {verifyTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-3.5">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                  Task Verification & Quality Review
+                  Task Verification & Review Portal
                 </span>
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
                   {verifyTask.title}
@@ -523,22 +588,268 @@ const ReviewTasks = () => {
               </div>
               <button
                 onClick={() => setVerifyTask(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md text-lg leading-none"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md text-lg leading-none cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* Task Details */}
-            {verifyTask.description && (
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 leading-relaxed max-h-40 overflow-y-auto">
-                <span className="font-semibold block mb-1 text-slate-900 dark:text-white">Task Description:</span>
-                {verifyTask.description}
+            {/* Task Information */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-1.5 text-xs">
+              <span className="font-semibold text-slate-900 dark:text-white block uppercase tracking-wider text-[11px]">
+                Task Requirements & Description:
+              </span>
+              <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                {verifyTask.description || "No description provided."}
+              </p>
+            </div>
+
+            {/* Developer Work Submission Section */}
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                  <span>Developer Work Deliverables</span>
+                </span>
+                {verifyTask.submittedAt && (
+                  <span className="text-[10px] text-slate-400">
+                    Submitted: {new Date(verifyTask.submittedAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
+                  </span>
+                )}
               </div>
-            )}
+
+              {/* External Links: GitHub & Live Demo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* GitHub Repo */}
+                <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 space-y-1">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    </svg>
+                    <span>GitHub Repository</span>
+                  </span>
+                  {verifyTask.githubUrl ? (
+                    <a
+                      href={verifyTask.githubUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 truncate"
+                    >
+                      <span className="truncate">{verifyTask.githubUrl}</span>
+                      <span>↗</span>
+                    </a>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">No GitHub link provided</p>
+                  )}
+                </div>
+
+                {/* Live Project Demo */}
+                <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 space-y-1">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="2" y1="12" x2="22" y2="12" />
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                    <span>Live Project Demo</span>
+                  </span>
+                  {verifyTask.liveUrl ? (
+                    <a
+                      href={verifyTask.liveUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 truncate"
+                    >
+                      <span className="truncate">{verifyTask.liveUrl}</span>
+                      <span>↗</span>
+                    </a>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">No live demo link provided</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Developer Notes */}
+              {verifyTask.developerNotes && (
+                <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 space-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    Developer Notes:
+                  </span>
+                  <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-line leading-relaxed">
+                    {verifyTask.developerNotes}
+                  </p>
+                </div>
+              )}
+
+              {/* Uploaded Files */}
+              {verifyTask.submissionFiles && verifyTask.submissionFiles.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    Attached Files ({verifyTask.submissionFiles.length}):
+                  </span>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {verifyTask.submissionFiles.map((f, idx) => {
+                      const fileUrl = getSubmissionFileUrl(f);
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs"
+                        >
+                          <div className="flex items-center gap-2 truncate mr-2">
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">
+                              {(f.name || "").split(".").pop().toUpperCase()}
+                            </span>
+                            <span className="font-medium text-slate-900 dark:text-white truncate">
+                              {f.name}
+                            </span>
+                            {f.size && (
+                              <span className="text-[10px] text-slate-400">
+                                ({(f.size / (1024 * 1024)).toFixed(2)} MB)
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => window.open(fileUrl, "_blank")}
+                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-[11px] text-slate-700 dark:text-slate-300 font-medium"
+                            >
+                              Preview
+                            </button>
+                            <a
+                              href={fileUrl}
+                              download={f.name || "file"}
+                              className="px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 text-[11px] text-indigo-700 dark:text-indigo-300 font-medium"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* AI Work Verification Section */}
+            <div className="p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-900/60 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.1-6.2-4.6-6.2 4.6 2.3-7.1-6.1-4.5h7.6z" />
+                  </svg>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    AI Work Verification (Groq API)
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={aiReviewLoading}
+                  onClick={() => handleRunAiReview(verifyTask._id)}
+                  className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {aiReviewLoading ? (
+                    <span>Evaluating...</span>
+                  ) : (
+                    <>
+                      <span>{verifyTask.aiReviewResult ? "Re-run AI Review" : "AI Review Submission"}</span>
+                      <svg className="w-3 h-3 text-yellow-300" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.1-6.2-4.6-6.2 4.6 2.3-7.1-6.1-4.5h7.6z" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {aiReviewError && (
+                <p className="text-xs text-rose-600 dark:text-rose-400">{aiReviewError}</p>
+              )}
+
+              {verifyTask.aiReviewResult ? (
+                <div className="space-y-3 pt-1">
+                  {/* Score & Summary */}
+                  <div className="flex items-center justify-between bg-white/70 dark:bg-slate-900/60 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-900/60">
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Completion Score:</span>
+                    <span
+                      className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${
+                        (verifyTask.aiReviewResult.completionScore || parseInt(verifyTask.aiReviewResult.score) || 0) >= 80
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          : (verifyTask.aiReviewResult.completionScore || parseInt(verifyTask.aiReviewResult.score) || 0) >= 50
+                          ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300"
+                          : "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300"
+                      }`}
+                    >
+                      {verifyTask.aiReviewResult.score || `${verifyTask.aiReviewResult.completionScore}%`}
+                    </span>
+                  </div>
+
+                  {verifyTask.aiReviewResult.reviewSummary && (
+                    <p className="text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800 leading-relaxed">
+                      {verifyTask.aiReviewResult.reviewSummary}
+                    </p>
+                  )}
+
+                  {/* Match Analysis */}
+                  {Array.isArray(verifyTask.aiReviewResult.matchAnalysis) && verifyTask.aiReviewResult.matchAnalysis.length > 0 && (
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                      {verifyTask.aiReviewResult.matchAnalysis.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2 rounded bg-white/70 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-[11px] flex items-center justify-between gap-2"
+                        >
+                          <div className="truncate">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">{item.requirement}</span>
+                            <span className="text-slate-400"> → {item.submission}</span>
+                          </div>
+                          <span
+                            className={`px-1.5 py-0.2 rounded-full font-bold text-[9px] shrink-0 border ${
+                              item.result === "Matched"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : item.result === "Partially Matched"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
+                            }`}
+                          >
+                            {item.result || "Matched"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Missing Points */}
+                  {Array.isArray(verifyTask.aiReviewResult.missingPoints) && verifyTask.aiReviewResult.missingPoints.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        Missing Points:
+                      </span>
+                      <ul className="list-disc list-inside text-xs text-slate-700 dark:text-slate-300 space-y-0.5">
+                        {verifyTask.aiReviewResult.missingPoints.map((pt, idx) => (
+                          <li key={idx}>{pt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-slate-400 italic">
+                    * AI review provided as assistive guidance. Company reviewer makes the final decision.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                  Click "AI Review Submission" to automatically verify task requirements against developer deliverables.
+                </p>
+              )}
+            </div>
 
             {/* Verification Checklist */}
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <span className="text-xs font-bold text-slate-900 dark:text-white block">
                 Verification Checklist
               </span>
@@ -584,7 +895,7 @@ const ReviewTasks = () => {
                 <button
                   type="button"
                   onClick={() => handleRequestRevisions(verifyTask._id)}
-                  className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
+                  className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
                 >
                   Request Revisions
                 </button>
@@ -592,7 +903,7 @@ const ReviewTasks = () => {
                   type="button"
                   disabled={!checklist.codeReviewed || !checklist.acceptanceMet || !checklist.qualityChecked}
                   onClick={() => handleApprove(verifyTask._id)}
-                  className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-colors shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Approve Work</span>
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

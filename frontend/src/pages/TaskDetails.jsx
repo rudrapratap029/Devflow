@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import UserProfileModal from "../components/UserProfileModal";
+import WorkSubmissionModal from "../components/WorkSubmissionModal";
 
 const BACKEND_BASE_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1"
@@ -16,6 +17,13 @@ const TaskDetails = () => {
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Work Submission modal state (Developer)
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+
+  // AI Review state (Company / Admin)
+  const [aiReviewLoading, setAiReviewLoading] = useState(false);
+  const [aiReviewError, setAiReviewError] = useState("");
 
   // Edit Task modal state (Admin / Company)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -244,6 +252,36 @@ const TaskDetails = () => {
     } finally {
       setAssigneeUpdating(false);
     }
+  };
+
+  // Handle Run AI Review using Groq API
+  const handleRunAiReview = async () => {
+    try {
+      setAiReviewLoading(true);
+      setAiReviewError("");
+      const res = await API.post(`/tasks/${taskId}/ai-review`);
+      if (res.data?.success) {
+        const { aiReviewResult, task: updatedTask } = res.data.data || {};
+        setTask((prev) => ({
+          ...prev,
+          ...(updatedTask || {}),
+          aiReviewResult: aiReviewResult || updatedTask?.aiReviewResult
+        }));
+      }
+    } catch (err) {
+      setAiReviewError(
+        err.response?.data?.message || "Failed to generate AI verification review"
+      );
+    } finally {
+      setAiReviewLoading(false);
+    }
+  };
+
+  const getSubmissionFileUrl = (file) => {
+    if (!file?.url) return "#";
+    return file.url.startsWith("http")
+      ? file.url
+      : `${BACKEND_BASE_URL}${file.url.startsWith("/") ? "" : "/"}${file.url}`;
   };
 
   // Handle Add Comment
@@ -575,11 +613,11 @@ const TaskDetails = () => {
                     {task.status === "In Progress" && (
                       <button
                         type="button"
-                        disabled={statusUpdating}
-                        onClick={() => handleStatusChange("Submitted For Review")}
-                        className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                        onClick={() => setIsSubmissionModalOpen(true)}
+                        className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                        title="Attach deliverables and submit for review"
                       >
-                        <span>Submit For Review</span>
+                        <span>Attach & Submit Work</span>
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <line x1="22" y1="2" x2="11" y2="13" />
                           <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -615,16 +653,34 @@ const TaskDetails = () => {
                           </h3>
                         </div>
                         <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
-                          The developer has finished their tasks and requested review. Inspect the details and attachments, then approve or request changes.
+                          The developer has finished their tasks and requested review. Inspect the deliverables below, run AI review, then approve or request changes.
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          disabled={aiReviewLoading}
+                          onClick={handleRunAiReview}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          title="Run AI evaluation on developer submission deliverables"
+                        >
+                          {aiReviewLoading ? (
+                            <span>Analyzing...</span>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5 text-yellow-300" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.1-6.2-4.6-6.2 4.6 2.3-7.1-6.1-4.5h7.6z" />
+                              </svg>
+                              <span>AI Review Submission</span>
+                            </>
+                          )}
+                        </button>
                         <button
                           type="button"
                           disabled={statusUpdating}
                           onClick={() => handleStatusChange("In Progress")}
-                          className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 border border-slate-300 dark:border-slate-700 text-xs font-semibold transition-colors disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 border border-slate-300 dark:border-slate-700 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
                           title="Send back for revisions"
                         >
                           Request Revisions
@@ -633,7 +689,7 @@ const TaskDetails = () => {
                           type="button"
                           disabled={statusUpdating}
                           onClick={() => handleStatusChange("Approved")}
-                          className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                          className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                           title="Approve completed work"
                         >
                           <span>Approve Work</span>
@@ -876,6 +932,369 @@ const TaskDetails = () => {
                   : "No due date set"}
               </span>
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Developer Work Submission & AI Review Section */}
+      <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 sm:p-7 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                Developer Work Submission
+              </h2>
+              {task.reviewStatus && (
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    task.reviewStatus === "Approved"
+                      ? "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300"
+                      : task.reviewStatus === "Completed"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      : "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300"
+                  }`}
+                >
+                  {task.reviewStatus}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {task.submittedAt ? (
+                <>
+                  Submitted on{" "}
+                  {new Date(task.submittedAt).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })}
+                </>
+              ) : (
+                <>Attach completed work deliverables before submitting for company review.</>
+              )}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Developer controls */}
+            {user?.role === "developer" && (
+              <>
+                {task.status === "In Progress" && (
+                  <button
+                    type="button"
+                    onClick={() => setIsSubmissionModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>{task.submittedAt ? "Update Submission" : "Attach Deliverables"}</span>
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </button>
+                )}
+                {(task.status === "Submitted For Review" ||
+                  task.status === "Approved" ||
+                  task.status === "Completed") && (
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                    <span>🔒 Editing disabled while under review</span>
+                  </span>
+                )}
+              </>
+            )}
+
+            {/* Company / Admin AI Verification Trigger */}
+            {(user?.role === "company" || user?.role === "admin") && (
+              <button
+                type="button"
+                disabled={
+                  aiReviewLoading ||
+                  (!task.developerNotes &&
+                    !task.githubUrl &&
+                    !task.liveUrl &&
+                    (!task.submissionFiles || task.submissionFiles.length === 0))
+                }
+                onClick={handleRunAiReview}
+                className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                title="Run AI review on developer deliverables using Groq API"
+              >
+                {aiReviewLoading ? (
+                  <span>Evaluating with AI...</span>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5 text-yellow-300" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.1-6.2-4.6-6.2 4.6 2.3-7.1-6.1-4.5h7.6z" />
+                    </svg>
+                    <span>AI Review Submission</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* AI Error Alert */}
+        {aiReviewError && (
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs">
+            {aiReviewError}
+          </div>
+        )}
+
+        {/* AI Verification Report Card */}
+        {task.aiReviewResult && (
+          <div className="p-5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-900/60 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100 dark:border-indigo-900/50">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-md bg-indigo-600 text-white">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.1-6.2-4.6-6.2 4.6 2.3-7.1-6.1-4.5h7.6z" />
+                  </svg>
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    AI Work Verification Report
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Evaluated via Groq AI • For assistive guidance only
+                  </p>
+                </div>
+              </div>
+
+              {/* Completion Score */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                  Completion Score:
+                </span>
+                <span
+                  className={`text-sm font-extrabold px-3 py-1 rounded-full border shadow-2xs ${
+                    (task.aiReviewResult.completionScore ||
+                      parseInt(task.aiReviewResult.score) ||
+                      0) >= 80
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
+                      : (task.aiReviewResult.completionScore ||
+                          parseInt(task.aiReviewResult.score) ||
+                          0) >= 50
+                      ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800"
+                      : "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800"
+                  }`}
+                >
+                  {task.aiReviewResult.score ||
+                    `${task.aiReviewResult.completionScore}%`}
+                </span>
+              </div>
+            </div>
+
+            {/* Review Summary */}
+            {task.aiReviewResult.reviewSummary && (
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-1">
+                  Review Summary
+                </span>
+                <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 bg-white/70 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800 leading-relaxed">
+                  {task.aiReviewResult.reviewSummary}
+                </p>
+              </div>
+            )}
+
+            {/* Match Analysis */}
+            {Array.isArray(task.aiReviewResult.matchAnalysis) &&
+              task.aiReviewResult.matchAnalysis.length > 0 && (
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-2">
+                    Match Analysis
+                  </span>
+                  <div className="space-y-2">
+                    {task.aiReviewResult.matchAnalysis.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="space-y-0.5 max-w-xl">
+                          <div className="font-semibold text-slate-900 dark:text-white">
+                            <span className="text-slate-500 font-normal">
+                              Task Requirement:{" "}
+                            </span>
+                            {item.requirement}
+                          </div>
+                          <div className="text-slate-600 dark:text-slate-400">
+                            <span className="text-slate-500 font-normal">
+                              Developer Submission:{" "}
+                            </span>
+                            {item.submission}
+                          </div>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
+                            item.result === "Matched"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300"
+                              : item.result === "Partially Matched"
+                              ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300"
+                              : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300"
+                          }`}
+                        >
+                          {item.result || "Matched"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            {/* Missing Points */}
+            {Array.isArray(task.aiReviewResult.missingPoints) &&
+              task.aiReviewResult.missingPoints.length > 0 && (
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block mb-1">
+                    Missing Points / Recommendations
+                  </span>
+                  <ul className="list-disc list-inside space-y-1 text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800">
+                    {task.aiReviewResult.missingPoints.map((point, idx) => (
+                      <li key={idx} className="leading-relaxed">
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+            <div className="pt-2 text-[11px] text-slate-400 dark:text-slate-500 italic">
+              * Show AI result only as assistance. Company reviewer makes the final approval decision.
+            </div>
+          </div>
+        )}
+
+        {/* Deliverables Grid & Details */}
+        <div className="space-y-4">
+          {/* External Links: GitHub & Live Demo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* GitHub Repository */}
+            <div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 space-y-1.5">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+                <span>GitHub Repository</span>
+              </span>
+              {task.githubUrl ? (
+                <a
+                  href={task.githubUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs sm:text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5 truncate"
+                >
+                  <span className="truncate">{task.githubUrl}</span>
+                  <span className="shrink-0">↗</span>
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                  No repository URL provided
+                </p>
+              )}
+            </div>
+
+            {/* Live Project Demo */}
+            <div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 space-y-1.5">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+                <span>Live Project Demo</span>
+              </span>
+              {task.liveUrl ? (
+                <a
+                  href={task.liveUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs sm:text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5 truncate"
+                >
+                  <span className="truncate">{task.liveUrl}</span>
+                  <span className="shrink-0">↗</span>
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                  No live demo URL provided
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Developer Notes */}
+          <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+              Additional Developer Notes
+            </span>
+            <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 whitespace-pre-line leading-relaxed">
+              {task.developerNotes || "No additional developer notes provided."}
+            </div>
+          </div>
+
+          {/* Deliverable Files List */}
+          <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Uploaded Deliverables & Files ({task.submissionFiles?.length || 0})
+              </span>
+              <span className="text-[11px] text-slate-400">
+                PDF, DOCX, XLSX, Images, ZIP
+              </span>
+            </div>
+
+            {!task.submissionFiles || task.submissionFiles.length === 0 ? (
+              <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2">
+                No deliverable files attached for this submission.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {task.submissionFiles.map((file, idx) => {
+                  const fileUrl = getSubmissionFileUrl(file);
+                  const ext = (file.name || "").split(".").pop().toLowerCase();
+
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2.5 truncate mr-2">
+                        <span className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 border border-indigo-200/60 dark:border-indigo-800/60">
+                          {ext.toUpperCase().slice(0, 4) || "FILE"}
+                        </span>
+                        <div className="truncate">
+                          <p className="text-xs font-medium text-slate-900 dark:text-white truncate">
+                            {file.name || "Deliverable"}
+                          </p>
+                          {file.size && (
+                            <p className="text-[10px] text-slate-400">
+                              {(file.size / (1024 * 1024)).toFixed(2)} MB
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => window.open(fileUrl, "_blank")}
+                          className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-semibold transition-colors"
+                          title="Preview file"
+                        >
+                          Preview
+                        </button>
+                        <a
+                          href={fileUrl}
+                          download={file.name || "download"}
+                          className="px-2.5 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold transition-colors"
+                          title="Download file"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1244,6 +1663,20 @@ const TaskDetails = () => {
           </div>
         </div>
       )}
+
+      {/* Developer Work Submission Modal */}
+      <WorkSubmissionModal
+        isOpen={isSubmissionModalOpen}
+        onClose={() => setIsSubmissionModalOpen(false)}
+        task={task}
+        onSubmitted={(updatedTask) => {
+          setTask((prev) => ({
+            ...prev,
+            ...(updatedTask || {})
+          }));
+          setIsSubmissionModalOpen(false);
+        }}
+      />
     </div>
   );
 };

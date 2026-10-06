@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import API, { getAvatarUrl } from "../services/api";
 import UserProfileModal from "../components/UserProfileModal";
+import WorkSubmissionModal from "../components/WorkSubmissionModal";
 
 const TaskBoard = () => {
   const { user: currentUser } = useAuth();
@@ -18,6 +19,9 @@ const TaskBoard = () => {
   const [acceptedUsers, setAcceptedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Work Submission Modal state for Developer
+  const [submissionModalTask, setSubmissionModalTask] = useState(null);
 
   // User Profile Explorer modal state
   const [profileModalUserId, setProfileModalUserId] = useState(null);
@@ -691,6 +695,32 @@ const TaskBoard = () => {
                                   {task.description}
                                 </p>
                               )}
+
+                              {/* Developer Submission Deliverables Chips */}
+                              {(task.submissionFiles?.length > 0 || task.githubUrl || task.liveUrl || task.aiReviewResult) && (
+                                <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                  {task.submissionFiles?.length > 0 && (
+                                    <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                      📎 {task.submissionFiles.length} file{task.submissionFiles.length > 1 ? "s" : ""}
+                                    </span>
+                                  )}
+                                  {task.githubUrl && (
+                                    <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                      GitHub
+                                    </span>
+                                  )}
+                                  {task.liveUrl && (
+                                    <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                      Live Demo
+                                    </span>
+                                  )}
+                                  {task.aiReviewResult && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                      🤖 AI: {task.aiReviewResult.score || `${task.aiReviewResult.completionScore}%`}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
 
                             {/* Assignee & Due Date */}
@@ -726,7 +756,7 @@ const TaskBoard = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleStatusChange(task._id, "In Progress")}
-                                    className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+                                    className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
                                   >
                                     <span>Start Work</span>
                                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -738,8 +768,8 @@ const TaskBoard = () => {
                                 {task.status === "In Progress" && (
                                   <button
                                     type="button"
-                                    onClick={() => handleStatusChange(task._id, "Submitted For Review")}
-                                    className="w-full py-1.5 px-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+                                    onClick={() => setSubmissionModalTask(task)}
+                                    className="w-full py-1.5 px-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
                                   >
                                     <span>Submit For Review</span>
                                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -775,7 +805,13 @@ const TaskBoard = () => {
                                   <select
                                     value={task.status === "Done" ? "Completed" : task.status}
                                     disabled={task.status === "Approved" || task.status === "Completed"}
-                                    onChange={(e) => handleStatusChange(task._id, e.target.value)}
+                                    onChange={(e) => {
+                                      if (e.target.value === "Submitted For Review") {
+                                        setSubmissionModalTask(task);
+                                      } else {
+                                        handleStatusChange(task._id, e.target.value);
+                                      }
+                                    }}
                                     className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 text-slate-700 dark:text-slate-300 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                                   >
                                     <option value="Todo">Todo</option>
@@ -1505,6 +1541,21 @@ const TaskBoard = () => {
         }}
         userId={profileModalUserId}
         initialData={profileModalUserObj}
+      />
+
+      {/* Developer Work Submission Modal */}
+      <WorkSubmissionModal
+        isOpen={Boolean(submissionModalTask)}
+        onClose={() => setSubmissionModalTask(null)}
+        task={submissionModalTask}
+        onSubmitted={(updatedTask) => {
+          if (updatedTask && updatedTask._id) {
+            setTasks((prev) =>
+              prev.map((t) => (t._id === updatedTask._id ? { ...t, ...updatedTask } : t))
+            );
+          }
+          setSubmissionModalTask(null);
+        }}
       />
     </div>
   );

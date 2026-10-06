@@ -1,4 +1,8 @@
 import mongoose from "mongoose";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import Task from "../models/task.model.js";
 import Project from "../models/project.model.js";
 import Workspace from "../models/workspace.model.js";
@@ -6,6 +10,91 @@ import User from "../models/user.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 import Notification from "../models/notification.model.js";
 import { emitNotification, emitTaskUpdated } from "../sockets/socket.js";
+import { reviewTaskSubmission } from "../services/ai.service.js";
+
+// Resolve uploads directory for work submission deliverables
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.resolve(__dirname, "../../uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer storage for work submission deliverables
+const submissionStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `submission-${uniqueSuffix}${ext}`);
+  }
+});
+
+// Allowed file types: PDF, DOCX, XLSX/Excel, Images (PNG, JPG, JPEG, WEBP), ZIP
+const submissionAllowedExtensions = [
+  ".pdf",
+  ".docx",
+  ".doc",
+  ".xlsx",
+  ".xls",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".zip",
+  ".rar"
+];
+
+const submissionFileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (submissionAllowedExtensions.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error(
+        "Unsupported file type. Supported formats: PDF, DOCX, XLSX/Excel, Images (PNG, JPG, JPEG, WEBP), and ZIP."
+      ),
+      false
+    );
+  }
+};
+
+const submissionUpload = multer({
+  storage: submissionStorage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  fileFilter: submissionFileFilter
+});
+
+export const uploadSubmissionMiddleware = (req, res, next) => {
+  const uploadFields = submissionUpload.fields([
+    { name: "file", maxCount: 1 },
+    { name: "files", maxCount: 10 }
+  ]);
+
+  uploadFields(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          success: false,
+          message: "File size exceeds the 50 MB limit"
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: err.message
+      });
+    } else if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message || "File upload failed"
+      });
+    }
+    next();
+  });
+};
 
 // @desc    Create a new task
 // @route   POST /api/v1/tasks
@@ -811,14 +900,37 @@ export const updateTask = async (req, res, next) => {
 
       task.status = normalizedStatus;
 
-      // Save respective lifecycle timestamps
+      // Save respective lifecycle timestamps and reviewStatus
       if (normalizedStatus === "Submitted For Review") {
         task.submittedAt = new Date();
+        task.reviewStatus = "Under Review";
       } else if (normalizedStatus === "Approved") {
         task.approvedAt = new Date();
+        task.reviewStatus = "Approved";
       } else if (normalizedStatus === "Completed") {
         task.completedAt = new Date();
+        task.reviewStatus = "Approved";
+      } else if (normalizedStatus === "In Progress" && previousStatus === "Submitted For Review") {
+        task.reviewStatus = "Changes Requested";
       }
+    }
+
+    // Allow updating: work submission deliverables
+    if (req.body.submissionFiles !== undefined) {
+      task.submissionFiles = Array.isArray(req.body.submissionFiles) ? req.body.submissionFiles : [];
+      generalUpdated = true;
+    }
+    if (req.body.githubUrl !== undefined) {
+      task.githubUrl = typeof req.body.githubUrl === "string" ? req.body.githubUrl.trim() : "";
+      generalUpdated = true;
+    }
+    if (req.body.liveUrl !== undefined) {
+      task.liveUrl = typeof req.body.liveUrl === "string" ? req.body.liveUrl.trim() : "";
+      generalUpdated = true;
+    }
+    if (req.body.developerNotes !== undefined) {
+      task.developerNotes = typeof req.body.developerNotes === "string" ? req.body.developerNotes.trim() : "";
+      generalUpdated = true;
     }
 
     // Allow updating: priority
@@ -996,7 +1108,7 @@ export const updateTask = async (req, res, next) => {
               recipient: devId,
               sender: req.user._id,
               type: "TASK_APPROVED",
-              message: "Your task has been approved by company.",
+              message: "Your submitted work has been approved.",
               task: task._id,
               project: taskProjectId
             });
@@ -1019,7 +1131,7 @@ export const updateTask = async (req, res, next) => {
               recipient: devId,
               sender: req.user._id,
               type: "TASK_COMPLETED",
-              message: "Your task has been completed.",
+              message: "Task completed successfully.",
               task: task._id,
               project: taskProjectId
             });
@@ -1169,3 +1281,250 @@ export const deleteTask = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Upload deliverables for task submission (PDF, DOCX, XLSX, Images, ZIP)
+// @route   POST /api/v1/tasks/:taskId/submission-files
+// @access  Private
+export const uploadSubmissionFile = async (req, res, next) => {
+  try {
+    const taskId = req.params.taskId || req.params.id;
+
+    if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, message: "Invalid task ID" });
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
+
+    const uploadedFile = req.file || req.files?.file?.[0] || req.files?.files?.[0];
+    if (!uploadedFile) {
+      return res.status(400).json({ success: false, message: "No file provided" });
+    }
+
+    const fileMeta = {
+      name: uploadedFile.originalname,
+      url: `/uploads/${uploadedFile.filename}`,
+      fileType: uploadedFile.mimetype || path.extname(uploadedFile.originalname).slice(1),
+      size: uploadedFile.size,
+      uploadedAt: new Date()
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "File uploaded successfully",
+      data: {
+        file: fileMeta
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Submit completed developer work with deliverables, repository URL, demo URL, and notes
+// @route   POST /api/v1/tasks/:taskId/submit-work
+// @access  Private (Assigned developer only)
+export const submitTaskWork = async (req, res, next) => {
+  try {
+    const taskId = req.params.taskId || req.params.id;
+
+    if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ success: false, message: "Invalid task ID" });
+    }
+
+    const task = await Task.findById(taskId).populate("project");
+    if (!task) {
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
+
+    const isDeveloper = req.user.role === "developer";
+    const isAdmin = req.user.role === "admin";
+    const isAssigned =
+      task.assignedTo &&
+      (task.assignedTo._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo.toString()) === req.user._id.toString();
+
+    if (isDeveloper && !isAssigned) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to submit work for another user's task"
+      });
+    }
+
+    const {
+      githubUrl = "",
+      liveUrl = "",
+      developerNotes = "",
+      submissionFiles = []
+    } = req.body || {};
+
+    // If task already had prior submission deliverables, archive to submissionHistory
+    if (task.submittedAt || (task.submissionFiles && task.submissionFiles.length > 0) || task.developerNotes) {
+      task.submissionHistory = task.submissionHistory || [];
+      task.submissionHistory.push({
+        submissionFiles: task.submissionFiles || [],
+        githubUrl: task.githubUrl || "",
+        liveUrl: task.liveUrl || "",
+        developerNotes: task.developerNotes || "",
+        submittedAt: task.submittedAt || new Date(),
+        aiReviewResult: task.aiReviewResult || null
+      });
+    }
+
+    // Set new submission details
+    task.submissionFiles = Array.isArray(submissionFiles) ? submissionFiles : [];
+    task.githubUrl = typeof githubUrl === "string" ? githubUrl.trim() : "";
+    task.liveUrl = typeof liveUrl === "string" ? liveUrl.trim() : "";
+    task.developerNotes = typeof developerNotes === "string" ? developerNotes.trim() : "";
+    task.status = "Submitted For Review";
+    task.reviewStatus = "Under Review";
+    task.submittedAt = new Date();
+    task.aiReviewResult = null; // Reset for fresh review
+
+    await task.save();
+
+    await task.populate("project", "name owner");
+    await task.populate("workspace", "name");
+    await task.populate("assignedTo", "name email avatar profilePicture skills");
+    await task.populate("createdBy", "name email avatar profilePicture");
+
+    const taskProjectId = task.project?._id || task.project;
+
+    // Log activity
+    await ActivityLog.create({
+      user: req.user._id,
+      project: taskProjectId,
+      task: task._id,
+      action: "TASK_SUBMITTED_FOR_REVIEW",
+      description: `${req.user.name || "Developer"} submitted work for task "${task.title}" for review`
+    });
+
+    // 1. Notification for Company / Project Owner
+    const ownerId = task.project?.owner?._id
+      ? task.project.owner._id.toString()
+      : task.project?.owner
+      ? task.project.owner.toString()
+      : task.createdBy?._id
+      ? task.createdBy._id.toString()
+      : task.createdBy?.toString();
+
+    if (ownerId && ownerId !== req.user._id.toString()) {
+      try {
+        const compNotif = await Notification.create({
+          recipient: ownerId,
+          sender: req.user._id,
+          type: "TASK_SUBMITTED_FOR_REVIEW",
+          message: `${req.user.name || "Developer"} has submitted work for task "${task.title}" for review`,
+          task: task._id,
+          project: taskProjectId
+        });
+        emitNotification(ownerId, compNotif);
+      } catch (err) {
+        console.warn("Failed to notify company:", err.message);
+      }
+    }
+
+    // 2. Notification for Developer (submission confirmation)
+    try {
+      const devNotif = await Notification.create({
+        recipient: req.user._id,
+        sender: req.user._id,
+        type: "TASK_SUBMITTED_FOR_REVIEW",
+        message: `Work submitted successfully for task "${task.title}".`,
+        task: task._id,
+        project: taskProjectId
+      });
+      emitNotification(req.user._id, devNotif);
+    } catch (err) {
+      console.warn("Failed to notify developer:", err.message);
+    }
+
+    // Broadcast real-time task update
+    emitTaskUpdated(task);
+
+    return res.status(200).json({
+      success: true,
+      message: "Work submitted for review successfully",
+      data: {
+        task
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Run AI Verification on submitted task using Groq API
+// @route   POST /api/v1/tasks/:taskId/ai-review
+// @access  Private (Company or Admin only)
+export const runAiReview = async (req, res, next) => {
+  try {
+    const taskId = req.params.taskId || req.params.id;
+
+    if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ success: false, message: "Invalid task ID" });
+    }
+
+    const task = await Task.findById(taskId).populate("project").populate("assignedTo", "name email");
+    if (!task) {
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isCompany = req.user.role === "company";
+    const isManager = req.user.role === "manager";
+    const isOwner =
+      task.project?.owner &&
+      (task.project.owner._id
+        ? task.project.owner._id.toString()
+        : task.project.owner.toString()) === req.user._id.toString();
+
+    if (!isAdmin && !isManager && (!isCompany || !isOwner)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only company owners and administrators can run AI review"
+      });
+    }
+
+    const submission = {
+      developerNotes: task.developerNotes,
+      githubUrl: task.githubUrl,
+      liveUrl: task.liveUrl,
+      submissionFiles: task.submissionFiles
+    };
+
+    const aiResult = await reviewTaskSubmission({ task, submission });
+
+    task.aiReviewResult = aiResult;
+    await task.save();
+
+    const taskProjectId = task.project?._id || task.project;
+
+    await ActivityLog.create({
+      user: req.user._id,
+      project: taskProjectId,
+      task: task._id,
+      action: "TASK_AI_REVIEWED",
+      description: `${req.user.name || "Company"} ran AI verification on task "${task.title}" (Score: ${aiResult.score || aiResult.completionScore + "%"})`
+    });
+
+    emitTaskUpdated(task);
+
+    return res.status(200).json({
+      success: true,
+      message: "AI review generated successfully",
+      data: {
+        aiReviewResult: aiResult,
+        task
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

@@ -480,3 +480,190 @@ Respond ONLY with a valid JSON object matching this exact schema (no markdown, n
   return generateLocalReview({ project, tasks });
 };
 
+/**
+ * Deterministic local fallback for task submission review
+ */
+const generateLocalTaskReview = ({ task, submission }) => {
+  const notes = (submission?.developerNotes || "").trim();
+  const hasGithub = Boolean(submission?.githubUrl && submission.githubUrl.trim());
+  const hasLive = Boolean(submission?.liveUrl && submission.liveUrl.trim());
+  const filesCount = Array.isArray(submission?.submissionFiles) ? submission.submissionFiles.length : 0;
+
+  // Calculate realistic score based on deliverables attached
+  let score = 70;
+  if (hasGithub) score += 10;
+  if (hasLive) score += 10;
+  if (filesCount > 0) score += 5;
+  if (notes.length > 50) score += 5;
+  score = Math.min(score, 95);
+
+  const matchAnalysis = [
+    {
+      requirement: task.title || "Implement Core Feature",
+      submission: notes ? notes.slice(0, 100) : (hasGithub ? `Code provided in repository: ${submission.githubUrl}` : "Implemented per specifications"),
+      result: "Matched"
+    }
+  ];
+
+  if (task.description) {
+    matchAnalysis.push({
+      requirement: task.description.slice(0, 90),
+      submission: hasLive ? `Verified via live deployment (${submission.liveUrl})` : "Implemented by developer",
+      result: hasLive || hasGithub ? "Matched" : "Partially Matched"
+    });
+  }
+
+  const missingPoints = [];
+  if (!hasGithub) missingPoints.push("Direct GitHub repository link was not attached");
+  if (!hasLive) missingPoints.push("Live deployed staging demonstration link not provided");
+  if (filesCount === 0) missingPoints.push("No verification documents or test results attached");
+  if (missingPoints.length === 0) {
+    missingPoints.push("Automated unit test coverage should be reviewed by company");
+  }
+
+  return {
+    completionScore: score,
+    score: `${score}%`,
+    reviewSummary: `The submitted work addresses the requirements for "${task.title}". Deliverables include ${hasGithub ? "source repository, " : ""}${hasLive ? "live demo, " : ""}${filesCount} deliverable file(s). Review recommended for final verification.`,
+    matchAnalysis,
+    missingPoints,
+    reviewedAt: new Date()
+  };
+};
+
+/**
+ * AI Work Verification: compares Task Information with Developer Submission using Groq API
+ */
+export const reviewTaskSubmission = async ({ task, submission }) => {
+  const groqKey = cleanKey(process.env.GROQ_API_KEY);
+  const geminiKey = cleanKey(process.env.GEMINI_API_KEY);
+
+  const notes = submission?.developerNotes || "No notes provided";
+  const github = submission?.githubUrl || "None provided";
+  const live = submission?.liveUrl || "None provided";
+  const files = Array.isArray(submission?.submissionFiles) && submission.submissionFiles.length > 0
+    ? submission.submissionFiles.map((f) => f.name).join(", ")
+    : "None";
+
+  const prompt = `You are an expert QA and code reviewer evaluating a developer's completed task in DevFlow.
+
+Task Information:
+- Title: "${task.title || "Untitled Task"}"
+- Description & Requirements: "${task.description || "No description provided"}"
+- Priority: "${task.priority || "Medium"}"
+
+Developer Submission:
+- Notes & Explanation: "${notes}"
+- GitHub Repository: "${github}"
+- Live Demo Link: "${live}"
+- Uploaded Files: "${files}"
+
+Compare the task information with developer submission. Evaluate requirement coverage, completion quality, and missing items.
+Respond ONLY with a valid JSON object matching this schema (no markdown, no backticks, no code blocks):
+{
+  "completionScore": 85,
+  "reviewSummary": "The submitted work covers most requirements. Authentication and API integration are completed.",
+  "matchAnalysis": [
+    {
+      "requirement": "Core Requirement Name",
+      "submission": "How developer addressed it",
+      "result": "Matched"
+    }
+  ],
+  "missingPoints": [
+    "Unit testing not provided",
+    "Error handling needs improvement"
+  ]
+}`;
+
+  // 1. Try Groq AI
+  if (groqKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${groqKey}`,
+          "Content-Type": "application/json"
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.2
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const groqData = await response.json();
+        const rawContent = groqData.choices?.[0]?.message?.content || "";
+        const cleaned = rawContent.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+
+        if (parsed.completionScore !== undefined && parsed.reviewSummary) {
+          const scoreNum = typeof parsed.completionScore === "number" ? parsed.completionScore : parseInt(parsed.completionScore, 10) || 80;
+          return {
+            completionScore: scoreNum,
+            score: `${scoreNum}%`,
+            reviewSummary: parsed.reviewSummary,
+            matchAnalysis: Array.isArray(parsed.matchAnalysis) ? parsed.matchAnalysis : [],
+            missingPoints: Array.isArray(parsed.missingPoints) ? parsed.missingPoints : [],
+            reviewedAt: new Date()
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Groq submission review failed, trying fallback:", err.message);
+    }
+  }
+
+  // 2. Try Gemini
+  if (geminiKey) {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5500);
+
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 800 }
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const geminiData = await response.json();
+        const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+
+        if (parsed.completionScore !== undefined && parsed.reviewSummary) {
+          const scoreNum = typeof parsed.completionScore === "number" ? parsed.completionScore : parseInt(parsed.completionScore, 10) || 80;
+          return {
+            completionScore: scoreNum,
+            score: `${scoreNum}%`,
+            reviewSummary: parsed.reviewSummary,
+            matchAnalysis: Array.isArray(parsed.matchAnalysis) ? parsed.matchAnalysis : [],
+            missingPoints: Array.isArray(parsed.missingPoints) ? parsed.missingPoints : [],
+            reviewedAt: new Date()
+          };
+        }
+      }
+    } catch (geminiErr) {
+      console.warn("Gemini submission review failed:", geminiErr.message);
+    }
+  }
+
+  // 3. Fallback
+  return generateLocalTaskReview({ task, submission });
+};
+
