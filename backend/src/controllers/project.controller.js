@@ -31,7 +31,12 @@ export const createProject = async (req, res, next) => {
       liveUrl,
       requiredSkills,
       experienceLevel,
-      deadline
+      deadline,
+      industry,
+      duration,
+      developersRequired,
+      budget,
+      attachments
     } = req.body || {};
     const targetWorkspaceId = workspace || workspaceId;
 
@@ -115,19 +120,28 @@ export const createProject = async (req, res, next) => {
       githubUrl: githubUrl ? githubUrl.trim() : "",
       liveUrl: liveUrl ? liveUrl.trim() : "",
       requiredSkills: cleanSkills,
-      experienceLevel: experienceLevel || "Intermediate",
-      deadline: deadline ? String(deadline).trim() : ""
+      experienceLevel: experienceLevel || "1–2 Years",
+      deadline: deadline ? String(deadline).trim() : "",
+      industry: industry ? String(industry).trim() : (req.user.industry || ""),
+      duration: duration ? String(duration).trim() : "",
+      developersRequired: Number(developersRequired) || 1,
+      budget: budget ? String(budget).trim() : "",
+      attachments: Array.isArray(attachments) ? attachments : []
     });
 
     // Automatically send notification to all Developers
     try {
       const developers = await User.find({ role: "developer" }).select("_id");
       const companyTitle = req.user.companyName || req.user.name || "A verified company";
+      const skillsText = cleanSkills.length > 0 ? ` Required Skills: ${cleanSkills.join(", ")}.` : "";
+      const deadlineText = project.deadline ? ` Deadline: ${project.deadline}.` : "";
+      const notifMessage = `New Project Available: ${companyTitle} has posted "${project.name}".${skillsText}${deadlineText}`;
+
       const notifDocs = developers.map((dev) => ({
         recipient: dev._id,
         sender: req.user._id,
         type: "NEW_PROJECT_AVAILABLE",
-        message: `New Project Available: ${companyTitle} has posted: "${project.name}"`,
+        message: notifMessage,
         project: project._id,
         task: null
       }));
@@ -204,9 +218,9 @@ export const getProjects = async (req, res, next) => {
     const projects = await Project.find(filter)
       .populate("workspace", "name")
       .populate("owner", "name email avatar profilePicture role companyName companyLogo companyWebsite industry verificationStatus")
-      .populate("members", "name email avatar profilePicture skills role companyName")
+      .populate("members", "name email avatar profilePicture skills role companyName bio github linkedin portfolio")
       .populate("submittedBy", "name email avatar profilePicture role skills")
-      .populate("developerResponses.developer", "name email avatar profilePicture skills role")
+      .populate("developerResponses.developer", "name email avatar profilePicture skills role bio github linkedin portfolio")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -246,9 +260,9 @@ export const getProjectById = async (req, res, next) => {
     const project = await Project.findById(projectId)
       .populate("workspace", "name")
       .populate("owner", "name email avatar profilePicture role companyName companyLogo companyWebsite industry verificationStatus")
-      .populate("members", "name email avatar profilePicture skills role companyName")
+      .populate("members", "name email avatar profilePicture skills role companyName bio github linkedin portfolio")
       .populate("submittedBy", "name email avatar profilePicture role skills")
-      .populate("developerResponses.developer", "name email avatar profilePicture skills role");
+      .populate("developerResponses.developer", "name email avatar profilePicture skills role bio github linkedin portfolio");
 
     if (!project) {
       return res.status(404).json({
@@ -323,7 +337,20 @@ export const updateProject = async (req, res, next) => {
       });
     }
 
-    const { name, description, status, githubUrl, liveUrl } = req.body || {};
+    const {
+      name,
+      description,
+      status,
+      githubUrl,
+      liveUrl,
+      requiredSkills,
+      experienceLevel,
+      deadline,
+      industry,
+      duration,
+      developersRequired,
+      budget
+    } = req.body || {};
 
     // Only owner, admin, or manager can rename or change the description of the project
     if (name !== undefined) {
@@ -370,11 +397,46 @@ export const updateProject = async (req, res, next) => {
       project.liveUrl = liveUrl ? liveUrl.trim() : "";
     }
 
+    if (industry !== undefined) {
+      project.industry = industry ? String(industry).trim() : "";
+    }
+
+    if (duration !== undefined) {
+      project.duration = duration ? String(duration).trim() : "";
+    }
+
+    if (experienceLevel !== undefined) {
+      project.experienceLevel = experienceLevel;
+    }
+
+    if (developersRequired !== undefined) {
+      project.developersRequired = Number(developersRequired) || 1;
+    }
+
+    if (budget !== undefined) {
+      project.budget = budget ? String(budget).trim() : "";
+    }
+
+    if (deadline !== undefined) {
+      project.deadline = deadline ? String(deadline).trim() : "";
+    }
+
+    if (requiredSkills !== undefined) {
+      let cleanSkills = [];
+      if (Array.isArray(requiredSkills)) {
+        cleanSkills = requiredSkills.map((s) => String(s).trim()).filter(Boolean);
+      } else if (typeof requiredSkills === "string") {
+        cleanSkills = requiredSkills.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+      project.requiredSkills = cleanSkills;
+    }
+
     await project.save();
 
     await project.populate("workspace", "name");
-    await project.populate("owner", "name email avatar profilePicture");
-    await project.populate("members", "name email avatar profilePicture skills");
+    await project.populate("owner", "name email avatar profilePicture role companyName companyLogo companyWebsite industry verificationStatus");
+    await project.populate("members", "name email avatar profilePicture skills role bio github linkedin portfolio");
+    await project.populate("developerResponses.developer", "name email avatar profilePicture skills role bio github linkedin portfolio");
 
     return res.status(200).json({
       success: true,
@@ -761,8 +823,8 @@ export const respondToProject = async (req, res, next) => {
 
     await project.populate("workspace", "name");
     await project.populate("owner", "name email avatar profilePicture role companyName companyLogo companyWebsite industry verificationStatus");
-    await project.populate("members", "name email avatar profilePicture skills role companyName");
-    await project.populate("developerResponses.developer", "name email avatar profilePicture skills role");
+    await project.populate("members", "name email avatar profilePicture skills role companyName bio github linkedin portfolio");
+    await project.populate("developerResponses.developer", "name email avatar profilePicture skills role bio github linkedin portfolio");
 
     return res.status(200).json({
       success: true,
@@ -1016,5 +1078,73 @@ export const reviewProjectWithAI = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get all users who have accepted the project invitation
+// @route   GET /api/v1/projects/:projectId/accepted-users
+// @access  Private (Project members, owners, admin)
+export const getProjectAcceptedUsers = async (req, res, next) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid project ID"
+      });
+    }
+
+    const project = await Project.findById(projectId)
+      .populate("members", "name email avatar profilePicture skills role bio")
+      .populate(
+        "developerResponses.developer",
+        "name email avatar profilePicture skills role bio github linkedin portfolio"
+      );
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    const acceptedUsers = [];
+    const seenIds = new Set();
+
+    // Collect developers who accepted the project invitation
+    if (Array.isArray(project.developerResponses)) {
+      for (const resp of project.developerResponses) {
+        if (resp.status === "Accepted" || resp.status === "In Progress") {
+          const dev = resp.developer;
+          if (dev) {
+            const devId = (dev._id || dev).toString();
+            if (!seenIds.has(devId)) {
+              seenIds.add(devId);
+              if (dev.name || dev.email) {
+                acceptedUsers.push(dev);
+              } else {
+                const userObj = await User.findById(devId).select(
+                  "name email avatar profilePicture skills role bio github linkedin portfolio"
+                );
+                if (userObj) acceptedUsers.push(userObj);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Accepted project users fetched successfully",
+      data: {
+        users: acceptedUsers,
+        count: acceptedUsers.length
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 

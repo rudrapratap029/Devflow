@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import UserProfileModal from "../components/UserProfileModal";
@@ -11,10 +11,22 @@ const BACKEND_BASE_URL = (
 const TaskDetails = () => {
   const { id: taskId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Edit Task modal state (Admin / Company)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: "",
+    description: "",
+    priority: "Medium",
+    dueDate: ""
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
 
   // User Profile Explorer modal state
   const [profileModalUserId, setProfileModalUserId] = useState(null);
@@ -38,6 +50,22 @@ const TaskDetails = () => {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [attachmentError, setAttachmentError] = useState("");
   const [attachmentSuccess, setAttachmentSuccess] = useState("");
+
+  // Permission helpers
+  const isCompanyOwner =
+    user?.role === "company" &&
+    ((task?.project?.owner?._id || task?.project?.owner) === user?._id ||
+      (task?.createdBy?._id || task?.createdBy) === user?._id);
+
+  const canManageTask =
+    user?.role === "admin" ||
+    user?.role === "manager" ||
+    isCompanyOwner;
+
+  const canUpdateStatus =
+    canManageTask ||
+    (user?.role === "developer" &&
+      (task?.assignedTo?._id || task?.assignedTo) === user?._id);
 
   // Fetch task, comments, and attachments
   const fetchTaskDetails = async () => {
@@ -77,24 +105,109 @@ const TaskDetails = () => {
     }
   }, [taskId]);
 
-  // Fetch users for task assignment (Admin/Manager)
+  // Fetch users for task assignment (Admin, Manager, Company)
   useEffect(() => {
     const fetchUsers = async () => {
+      if (user?.role === "company" && task?.project?._id) {
+        try {
+          const res = await API.get(`/projects/${task.project._id}/accepted-users`);
+          if (res.data?.success && res.data.data?.users) {
+            setAvailableUsers(res.data.data.users);
+            return;
+          }
+        } catch (err) {
+          console.error("Failed to load accepted users:", err);
+        }
+      }
+
       if (user?.role === "admin" || user?.role === "manager") {
         try {
           const res = await API.get("/users");
           const list = res.data?.data || res.data?.users || [];
           if (Array.isArray(list) && list.length > 0) {
             setAvailableUsers(list);
+            return;
           }
         } catch (err) {
           console.error("Failed to load users for assignment:", err);
         }
       }
+
+      // Fallback to project developer responses or members
+      if (task?.project) {
+        if (Array.isArray(task.project.developerResponses)) {
+          const acceptedDevs = task.project.developerResponses
+            .filter((r) => r.status === "Accepted" || r.status === "In Progress")
+            .map((r) => r.developer)
+            .filter(Boolean);
+          if (acceptedDevs.length > 0) {
+            setAvailableUsers(acceptedDevs);
+            return;
+          }
+        }
+        if (Array.isArray(task.project.members) && task.project.members.length > 0) {
+          setAvailableUsers(task.project.members);
+        }
+      }
     };
 
     fetchUsers();
-  }, [user?.role]);
+  }, [user?.role, task?.project]);
+
+  // Handle Open Edit Modal
+  const handleOpenEdit = () => {
+    setEditError("");
+    setEditFormData({
+      title: task?.title || "",
+      description: task?.description || "",
+      priority: task?.priority || "Medium",
+      dueDate: task?.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : ""
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Handle Save Edit Form
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editFormData.title.trim()) return;
+
+    try {
+      setEditLoading(true);
+      setEditError("");
+
+      const payload = {
+        title: editFormData.title.trim(),
+        description: editFormData.description.trim(),
+        priority: editFormData.priority
+      };
+      if (editFormData.dueDate) {
+        payload.dueDate = editFormData.dueDate;
+      }
+
+      const res = await API.put(`/tasks/${taskId}`, payload);
+      if (res.data?.success) {
+        setTask(res.data.data.task);
+        setIsEditModalOpen(false);
+      }
+    } catch (err) {
+      setEditError(err.response?.data?.message || "Failed to update task");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Handle Delete Task (Admin / Company)
+  const handleDeleteTask = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete this task?")) return;
+    try {
+      const res = await API.delete(`/tasks/${taskId}`);
+      if (res.data?.success) {
+        navigate(`/task-board?project=${task?.project?._id || ""}`);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete task");
+    }
+  };
 
   // Handle Status Update
   const handleStatusChange = async (newStatus) => {
@@ -285,22 +398,259 @@ const TaskDetails = () => {
             </h1>
           </div>
 
-          {/* Status selector */}
-          <div className="flex items-center space-x-2 shrink-0">
-            <label htmlFor="task-status-select" className="text-xs text-slate-500 dark:text-slate-400 font-medium">Status:</label>
-            <select
-              id="task-status-select"
-              disabled={statusUpdating}
-              value={task.status}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
-            >
-              <option value="Todo">Todo</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Done">Done</option>
-            </select>
+          {/* Status selector and Admin/Company Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <div className="flex items-center space-x-2">
+              <label htmlFor="task-status-select" className="text-xs text-slate-500 dark:text-slate-400 font-medium">Status:</label>
+              <select
+                id="task-status-select"
+                disabled={statusUpdating || !canUpdateStatus}
+                value={task.status === "Done" ? "Completed" : task.status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                title={!canUpdateStatus ? "Only the assigned developer, project owner, or admin can update status" : "Update status"}
+                className="text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="Todo">Todo</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Submitted For Review">Submitted For Review</option>
+                <option value="Approved" disabled={user?.role === "developer"}>
+                  Approved {user?.role === "developer" ? "(Company Only)" : ""}
+                </option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+
+            {canManageTask && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleOpenEdit}
+                  className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-medium transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+                  title="Edit Task Details"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                  <span>Edit</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteTask}
+                  className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-medium transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+                  title="Delete Task"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                  <span>Delete</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Workflow Lifecycle Stepper & Action Banners */}
+        {(() => {
+          const workflowSteps = [
+            { id: "Todo", title: "Todo", desc: "Backlog" },
+            { id: "In Progress", title: "In Progress", desc: "Developing" },
+            { id: "Submitted For Review", title: "Submitted", desc: "Under Review" },
+            { id: "Approved", title: "Approved", desc: "Company Accepted" },
+            { id: "Completed", title: "Completed", desc: "Work Finished" }
+          ];
+
+          const getStepIndex = (status) => {
+            if (status === "Done") return 4;
+            const idx = workflowSteps.findIndex((s) => s.id === status);
+            return idx >= 0 ? idx : 0;
+          };
+
+          const currentStepIdx = getStepIndex(task.status);
+          const isAssignedDev =
+            user?.role === "developer" &&
+            ((task?.assignedTo?._id || task?.assignedTo) === user?._id);
+
+          return (
+            <div className="space-y-4">
+              <div className="p-4 sm:p-5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/70 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                    Workflow Status
+                  </span>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    Current: {task.status === "Done" ? "Completed" : task.status}
+                  </span>
+                </div>
+
+                {/* 5-Step Progress Steps */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {workflowSteps.map((step, idx) => {
+                    const isPast = idx < currentStepIdx;
+                    const isCurrent = idx === currentStepIdx;
+
+                    return (
+                      <div
+                        key={step.id}
+                        className={`p-2.5 rounded-lg border text-center transition-all ${
+                          isCurrent
+                            ? "bg-white dark:bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs"
+                            : isPast
+                            ? "bg-white/70 dark:bg-slate-900/40 border-teal-300 dark:border-teal-800 text-teal-700 dark:text-teal-400"
+                            : "bg-slate-100/50 dark:bg-slate-900/20 border-slate-200/60 dark:border-slate-800 text-slate-400 opacity-70"
+                        }`}
+                      >
+                        <div className="flex items-center justify-center mb-1">
+                          <span
+                            className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                              isCurrent
+                                ? "bg-indigo-600 text-white"
+                                : isPast
+                                ? "bg-teal-600 text-white"
+                                : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                            }`}
+                          >
+                            {isPast ? "✓" : idx + 1}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold truncate text-slate-900 dark:text-white">
+                          {step.title}
+                        </p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                          {step.desc}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Developer Workflow Action Banner */}
+              {isAssignedDev && (
+                <div className="p-4 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-bold text-blue-900 dark:text-blue-200">
+                      Developer Workflow Control
+                    </h3>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                      {task.status === "Todo" && "You are assigned to this task. Start working when ready."}
+                      {task.status === "In Progress" && "You are actively working on this task. Submit for review once your changes are ready."}
+                      {task.status === "Submitted For Review" && "Work submitted! The company will review your submission and approve it."}
+                      {task.status === "Approved" && "Company approved your work! Mark it completed to finish the task."}
+                      {(task.status === "Completed" || task.status === "Done") && "Task is completed and verified. Great job!"}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {task.status === "Todo" && (
+                      <button
+                        type="button"
+                        disabled={statusUpdating}
+                        onClick={() => handleStatusChange("In Progress")}
+                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <span>Start Work</span>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                      </button>
+                    )}
+
+                    {task.status === "In Progress" && (
+                      <button
+                        type="button"
+                        disabled={statusUpdating}
+                        onClick={() => handleStatusChange("Submitted For Review")}
+                        className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <span>Submit For Review</span>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="22" y1="2" x2="11" y2="13" />
+                          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                      </button>
+                    )}
+
+                    {task.status === "Approved" && (
+                      <button
+                        type="button"
+                        disabled={statusUpdating}
+                        onClick={() => handleStatusChange("Completed")}
+                        className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <span>Mark Completed ✓</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Company Review Banner (when submitted for review or approved) */}
+              {(user?.role === "company" || user?.role === "admin") && (
+                <div className="space-y-2">
+                  {task.status === "Submitted For Review" && (
+                    <div className="p-4 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>
+                          <h3 className="text-xs sm:text-sm font-bold text-purple-900 dark:text-purple-200">
+                            Work Submitted For Review
+                          </h3>
+                        </div>
+                        <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                          The developer has finished their tasks and requested review. Inspect the details and attachments, then approve or request changes.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          disabled={statusUpdating}
+                          onClick={() => handleStatusChange("In Progress")}
+                          className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 border border-slate-300 dark:border-slate-700 text-xs font-semibold transition-colors disabled:opacity-50"
+                          title="Send back for revisions"
+                        >
+                          Request Revisions
+                        </button>
+                        <button
+                          type="button"
+                          disabled={statusUpdating}
+                          onClick={() => handleStatusChange("Approved")}
+                          className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                          title="Approve completed work"
+                        >
+                          <span>Approve Work</span>
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {task.status === "Approved" && (
+                    <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-xs text-teal-800 dark:text-teal-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <span>✓ Work Approved by Company</span>
+                      </span>
+                      <span className="text-[11px] text-teal-600 dark:text-teal-400">
+                        Waiting for developer to mark completed
+                      </span>
+                    </div>
+                  )}
+
+                  {(task.status === "Completed" || task.status === "Done") && (
+                    <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 font-semibold">
+                      <span>✓ Task Fully Completed and Verified</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Description */}
         <div>
@@ -342,7 +692,7 @@ const TaskDetails = () => {
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Assigned To
             </p>
-            {user?.role === "admin" || user?.role === "manager" ? (
+            {canManageTask ? (
               <>
                 <select
                   disabled={assigneeUpdating}
@@ -351,6 +701,14 @@ const TaskDetails = () => {
                   className="w-full text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs mt-1"
                 >
                   <option value="">Unassigned</option>
+                  {task.assignedTo &&
+                    !availableUsers.some(
+                      (u) => u._id === (task.assignedTo?._id || task.assignedTo)
+                    ) && (
+                      <option value={task.assignedTo?._id || task.assignedTo}>
+                        {task.assignedTo?.name || "Assigned Developer"}
+                      </option>
+                    )}
                   {availableUsers.map((u) => {
                     const roleFormatted = u.role
                       ? u.role.charAt(0).toUpperCase() + u.role.slice(1)
@@ -364,6 +722,11 @@ const TaskDetails = () => {
                     );
                   })}
                 </select>
+                {user?.role === "company" && availableUsers.length === 0 && (
+                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                    ⚠️ Only developers who have accepted this project can be assigned tasks. No developers have accepted yet.
+                  </p>
+                )}
               </>
             ) : (
               <p className="text-sm font-medium text-slate-900 dark:text-white mt-1.5">
@@ -737,6 +1100,114 @@ const TaskDetails = () => {
         userId={profileModalUserId}
         initialData={profileModalUserObj}
       />
+
+      {/* Edit Task Modal (Admin & Company) */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                Edit Task
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs sm:text-sm">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                  Task Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.title}
+                  onChange={(e) =>
+                    setEditFormData((prev) => ({ ...prev, title: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                  Description
+                </label>
+                <textarea
+                  rows={4}
+                  value={editFormData.description}
+                  onChange={(e) =>
+                    setEditFormData((prev) => ({ ...prev, description: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                    Priority
+                  </label>
+                  <select
+                    value={editFormData.priority}
+                    onChange={(e) =>
+                      setEditFormData((prev) => ({ ...prev, priority: e.target.value }))
+                    }
+                    className="w-full px-3.5 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.dueDate}
+                    onChange={(e) =>
+                      setEditFormData((prev) => ({ ...prev, dueDate: e.target.value }))
+                    }
+                    className="w-full px-3.5 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading || !editFormData.title.trim()}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors shadow-xs disabled:opacity-50"
+                >
+                  {editLoading ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

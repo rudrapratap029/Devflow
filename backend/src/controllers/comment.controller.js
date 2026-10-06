@@ -47,15 +47,21 @@ export const createComment = async (req, res, next) => {
       });
     }
 
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
     const isOwner = project.owner && project.owner.toString() === req.user._id.toString();
     const isMember = project.members && project.members.some(
       (memberId) => memberId.toString() === req.user._id.toString()
     );
+    const isAssigned =
+      task.assignedTo &&
+      (task.assignedTo._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo.toString()) === req.user._id.toString();
 
-    if (!isOwner && !isMember) {
+    if (!isAdmin && !isOwner && !isMember && !isAssigned) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. You do not have access to this project"
+        message: "Access denied. You do not have access to comment on this task"
       });
     }
 
@@ -154,12 +160,18 @@ export const getCommentsByTaskId = async (req, res, next) => {
       });
     }
 
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
     const isOwner = project.owner && project.owner.toString() === req.user._id.toString();
     const isMember = project.members && project.members.some(
       (memberId) => memberId.toString() === req.user._id.toString()
     );
+    const isAssigned =
+      task.assignedTo &&
+      (task.assignedTo._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo.toString()) === req.user._id.toString();
 
-    if (!isOwner && !isMember) {
+    if (!isAdmin && !isOwner && !isMember && !isAssigned) {
       return res.status(403).json({
         success: false,
         message: "Access denied. You do not have access to this project"
@@ -185,7 +197,7 @@ export const getCommentsByTaskId = async (req, res, next) => {
 
 // @desc    Update a comment
 // @route   PUT /api/v1/comments/:commentId
-// @access  Private (Comment owner only)
+// @access  Private (Comment owner or Admin only)
 export const updateComment = async (req, res, next) => {
   try {
     const commentId = req.params.commentId || req.params.id;
@@ -216,8 +228,10 @@ export const updateComment = async (req, res, next) => {
       });
     }
 
-    // Authorization: only comment owner can update
-    if (comment.user.toString() !== req.user._id.toString()) {
+    // Authorization: only comment owner or Admin can update
+    const isOwner = comment.user.toString() === req.user._id.toString();
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: "Access denied. You can only update your own comment"
@@ -245,7 +259,7 @@ export const updateComment = async (req, res, next) => {
 
 // @desc    Delete a comment
 // @route   DELETE /api/v1/comments/:commentId
-// @access  Private (Comment owner only)
+// @access  Private (Comment owner or Admin only)
 export const deleteComment = async (req, res, next) => {
   try {
     const commentId = req.params.commentId || req.params.id;
@@ -270,8 +284,10 @@ export const deleteComment = async (req, res, next) => {
       });
     }
 
-    // Authorization: only comment owner can delete
-    if (comment.user.toString() !== req.user._id.toString()) {
+    // Authorization: only comment owner or Admin can delete
+    const isOwner = comment.user.toString() === req.user._id.toString();
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: "Access denied. You can only delete your own comment"

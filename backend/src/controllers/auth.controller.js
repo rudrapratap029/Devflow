@@ -111,6 +111,13 @@ export const register = async (req, res, next) => {
           industry: user.industry,
           companyLogo: user.companyLogo,
           verificationStatus: user.verificationStatus,
+          location: user.location || "",
+          companySize: user.companySize || "",
+          foundedYear: user.foundedYear || "",
+          hiringStatus: user.hiringStatus || "Actively Hiring",
+          github: user.github || "",
+          linkedin: user.linkedin || "",
+          portfolio: user.portfolio || "",
           isActive: user.isActive,
           createdAt: user.createdAt
         }
@@ -182,6 +189,14 @@ export const login = async (req, res, next) => {
       });
     }
 
+    // Verify company status: Unapproved companies cannot access until approved by Admin
+    if (user.role === "company" && user.verificationStatus !== "Approved") {
+      return res.status(403).json({
+        success: false,
+        message: "Your company account is pending administrative verification. Only an administrator can approve company accounts."
+      });
+    }
+
     // Generate Access and Refresh Tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -227,6 +242,13 @@ export const login = async (req, res, next) => {
           industry: user.industry || "",
           companyLogo: user.companyLogo || "",
           verificationStatus: user.verificationStatus || "Approved",
+          location: user.location || "",
+          companySize: user.companySize || "",
+          foundedYear: user.foundedYear || "",
+          hiringStatus: user.hiringStatus || "Actively Hiring",
+          github: user.github || "",
+          linkedin: user.linkedin || "",
+          portfolio: user.portfolio || "",
           isActive: user.isActive
         }
       }

@@ -43,6 +43,33 @@ const projectSchema = new mongoose.Schema(
       trim: true,
       default: ""
     },
+    industry: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    duration: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    developersRequired: {
+      type: Number,
+      default: 1
+    },
+    budget: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    attachments: [
+      {
+        name: { type: String, default: "" },
+        url: { type: String, default: "" },
+        fileType: { type: String, default: "" },
+        size: { type: Number, default: 0 }
+      }
+    ],
     requiredSkills: [
       {
         type: String,
@@ -51,8 +78,8 @@ const projectSchema = new mongoose.Schema(
     ],
     experienceLevel: {
       type: String,
-      enum: ["Entry Level", "Intermediate", "Senior", "Expert", "Any"],
-      default: "Intermediate"
+      enum: ["Fresher", "1–2 Years", "3+ Years", "Entry Level", "Intermediate", "Senior", "Expert", "Any"],
+      default: "1–2 Years"
     },
     deadline: {
       type: String,

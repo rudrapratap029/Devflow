@@ -173,6 +173,19 @@ const NotificationDropdown = () => {
               ))
             )}
           </div>
+
+          {/* Footer link to Notification Page */}
+          <div className="p-2.5 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 text-center">
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                navigate("/notifications");
+              }}
+              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              Open Notification Page →
+            </button>
+          </div>
         </div>
       )}
     </div>

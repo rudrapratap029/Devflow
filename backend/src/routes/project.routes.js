@@ -10,7 +10,8 @@ import {
   getProjectSummary,
   submitProject,
   reviewProjectWithAI,
-  respondToProject
+  respondToProject,
+  getProjectAcceptedUsers
 } from "../controllers/project.controller.js";
 import { getProjectActivityLogs } from "../controllers/activity.controller.js";
 import { protect, authorize } from "../middleware/auth.middleware.js";
@@ -19,6 +20,9 @@ const router = Router();
 
 // Protect all project routes
 router.use(protect);
+
+// Accepted users for a project (only developers who accepted the project invitation)
+router.get("/:projectId/accepted-users", getProjectAcceptedUsers);
 
 // Project summary route (Admin, Manager, and Company)
 router.post("/:projectId/summary", authorize("admin", "manager", "company"), getProjectSummary);

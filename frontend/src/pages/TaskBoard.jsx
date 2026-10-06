@@ -15,6 +15,7 @@ const TaskBoard = () => {
   const [selectedProjectId, setSelectedProjectId] = useState(selectedProjectParam);
   const [tasks, setTasks] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [acceptedUsers, setAcceptedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -244,12 +245,29 @@ const TaskBoard = () => {
     }
   };
 
+  // Delete Task Handler (Admin / Company)
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm("Are you sure you want to delete this task?")) return;
+    try {
+      const res = await API.delete(`/tasks/${taskId}`);
+      if (res.data?.success) {
+        setTasks((prev) => prev.filter((t) => t._id !== taskId));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete task");
+    }
+  };
+
   // Fetch available users for task assignment
   const activeProject = projects.find((p) => p._id === selectedProjectId);
 
   useEffect(() => {
     const fetchUsers = async () => {
-      if (currentUser?.role === "admin" || currentUser?.role === "manager") {
+      if (
+        currentUser?.role === "admin" ||
+        currentUser?.role === "manager" ||
+        currentUser?.role === "company"
+      ) {
         try {
           const res = await API.get("/users");
           const list = res.data?.data || res.data?.users || [];
@@ -270,6 +288,35 @@ const TaskBoard = () => {
 
     fetchUsers();
   }, [currentUser?.role, activeProject]);
+
+  // Fetch only users who have accepted the project invitation
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setAcceptedUsers([]);
+      return;
+    }
+
+    const fetchAccepted = async () => {
+      try {
+        const res = await API.get(`/projects/${selectedProjectId}/accepted-users`);
+        if (res.data?.success) {
+          setAcceptedUsers(res.data.data?.users || []);
+        }
+      } catch (err) {
+        if (activeProject && Array.isArray(activeProject.developerResponses)) {
+          const devs = activeProject.developerResponses
+            .filter((r) => r.status === "Accepted" || r.status === "In Progress")
+            .map((r) => r.developer)
+            .filter(Boolean);
+          setAcceptedUsers(devs);
+        } else {
+          setAcceptedUsers([]);
+        }
+      }
+    };
+
+    fetchAccepted();
+  }, [selectedProjectId, activeProject]);
 
   // Filter tasks based on search and filters
   const filteredTasks = tasks.filter((t) => {
@@ -299,11 +346,38 @@ const TaskBoard = () => {
     setFilterAssignee("All");
   };
 
-  // Group tasks by status columns
+  // Group tasks by 5 developer workflow status columns
   const columns = [
-    { id: "Todo", title: "Todo", dotColor: "bg-slate-400" },
-    { id: "In Progress", title: "In Progress", dotColor: "bg-amber-500" },
-    { id: "Done", title: "Done", dotColor: "bg-emerald-500" }
+    {
+      id: "Todo",
+      title: "Todo",
+      dotColor: "bg-slate-400",
+      badgeColor: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+    },
+    {
+      id: "In Progress",
+      title: "In Progress",
+      dotColor: "bg-blue-500",
+      badgeColor: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900/50"
+    },
+    {
+      id: "Submitted For Review",
+      title: "Submitted For Review",
+      dotColor: "bg-purple-500",
+      badgeColor: "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-900/50"
+    },
+    {
+      id: "Approved",
+      title: "Approved",
+      dotColor: "bg-teal-500",
+      badgeColor: "bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border-teal-200 dark:border-teal-900/50"
+    },
+    {
+      id: "Completed",
+      title: "Completed",
+      dotColor: "bg-emerald-500",
+      badgeColor: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/50"
+    }
   ];
 
   const getPriorityBadge = (priority) => {
@@ -336,7 +410,7 @@ const TaskBoard = () => {
             Kanban Task Board
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Track workflow progress across Todo, In Progress, and Done stages
+            Track workflow progress across Todo, In Progress, Submitted For Review, Approved, and Completed
           </p>
         </div>
 
@@ -374,17 +448,35 @@ const TaskBoard = () => {
             </Link>
           )}
 
-          <button
-            onClick={() => openCreateModal("Todo")}
-            disabled={!selectedProjectId}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 shadow-xs"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span>New Task</span>
-          </button>
+          {currentUser?.role !== "developer" && (
+            <>
+              <Link
+                to={`/tasks/create${selectedProjectId ? `?project=${selectedProjectId}` : ""}`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-[#111827] hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs sm:text-sm font-medium transition-colors border border-slate-300 dark:border-slate-700 shadow-xs"
+                title="Open Company Task Assignment Page"
+              >
+                <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <line x1="19" y1="8" x2="19" y2="14" />
+                  <line x1="22" y1="11" x2="16" y2="11" />
+                </svg>
+                <span>Assign Tasks</span>
+              </Link>
+
+              <button
+                onClick={() => openCreateModal("Todo")}
+                disabled={!selectedProjectId}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 shadow-xs"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span>New Task</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -479,17 +571,22 @@ const TaskBoard = () => {
         </div>
       )}
 
-      {/* Kanban 3-Column Layout with Horizontal Scroll for Mobile */}
+      {/* Kanban 5-Column Layout with Horizontal Scroll for Mobile */}
       {selectedProjectId && (
         <div className="overflow-x-auto pb-4">
-          <div className="min-w-[850px] md:min-w-0 grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="min-w-[1100px] xl:min-w-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {columns.map((col) => {
-              const colTasks = filteredTasks.filter((t) => t.status === col.id);
+              const colTasks = filteredTasks.filter((t) => {
+                if (col.id === "Completed") {
+                  return t.status === "Completed" || t.status === "Done";
+                }
+                return t.status === col.id;
+              });
 
               return (
                 <div
                   key={col.id}
-                  className="bg-slate-100/60 dark:bg-[#0e131f]/70 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col min-h-[520px]"
+                  className="bg-slate-100/60 dark:bg-[#0e131f]/70 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3 flex flex-col min-h-[520px]"
                 >
                   {/* Column Header */}
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/80 dark:border-slate-800/80">
@@ -502,16 +599,18 @@ const TaskBoard = () => {
                         {colTasks.length}
                       </span>
                     </div>
-                    <button
-                      onClick={() => openCreateModal(col.id)}
-                      title={`Add task to ${col.title}`}
-                      className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-slate-800/60 transition-colors"
-                    >
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                    </button>
+                    {currentUser?.role !== "developer" && (
+                      <button
+                        onClick={() => openCreateModal(col.id)}
+                        title={`Add task to ${col.title}`}
+                        className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-slate-800/60 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
 
                   {/* Column Tasks */}
@@ -579,23 +678,161 @@ const TaskBoard = () => {
                               )}
                             </div>
 
-                            {/* Status Change Selector */}
-                            <div className="flex items-center justify-between pt-1">
-                              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                                Status:
-                              </span>
-                              <select
-                                value={task.status}
-                                onChange={(e) =>
-                                  handleStatusChange(task._id, e.target.value)
-                                }
-                                className="text-[11px] bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                              >
-                                <option value="Todo">Todo</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Done">Done</option>
-                              </select>
-                            </div>
+                            {/* Workflow Controls: Developer vs Company */}
+                            {currentUser?.role === "developer" ? (
+                              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                                {task.status === "Todo" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(task._id, "In Progress")}
+                                    className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+                                  >
+                                    <span>Start Work</span>
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <polygon points="5 3 19 12 5 21 5 3" />
+                                    </svg>
+                                  </button>
+                                )}
+
+                                {task.status === "In Progress" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(task._id, "Submitted For Review")}
+                                    className="w-full py-1.5 px-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+                                  >
+                                    <span>Submit For Review</span>
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <line x1="22" y1="2" x2="11" y2="13" />
+                                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                    </svg>
+                                  </button>
+                                )}
+
+                                {task.status === "Submitted For Review" && (
+                                  <div className="text-center py-1.5 px-2 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[11px] font-semibold flex items-center justify-center gap-1">
+                                    <span>⏳ Awaiting Company Approval</span>
+                                  </div>
+                                )}
+
+                                {task.status === "Approved" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(task._id, "Completed")}
+                                    className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+                                  >
+                                    <span>Complete Work ✓</span>
+                                  </button>
+                                )}
+
+                                {(task.status === "Completed" || task.status === "Done") && (
+                                  <div className="text-center py-1.5 px-2 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold flex items-center justify-center gap-1">
+                                    <span>✓ Work Completed</span>
+                                  </div>
+                                )}
+
+                                {/* Developer Status Selector */}
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400 dark:text-slate-500 font-medium">
+                                    Status:
+                                  </span>
+                                  <select
+                                    value={task.status === "Done" ? "Completed" : task.status}
+                                    onChange={(e) => handleStatusChange(task._id, e.target.value)}
+                                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 text-slate-700 dark:text-slate-300 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  >
+                                    <option value="Todo">Todo</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Submitted For Review">Submitted For Review</option>
+                                    <option value="Approved" disabled>Approved (Company Only)</option>
+                                    <option value="Completed">Completed</option>
+                                  </select>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Company / Admin View */
+                              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                                {task.status === "Submitted For Review" ? (
+                                  <div className="p-2 rounded-lg bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                                        Submitted Work
+                                      </span>
+                                      <Link
+                                        to={`/tasks/${task._id}`}
+                                        className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+                                      >
+                                        Details →
+                                      </Link>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStatusChange(task._id, "Approved")}
+                                        className="flex-1 py-1.5 px-2 rounded bg-teal-600 hover:bg-teal-700 text-white font-semibold text-[11px] shadow-2xs transition-colors flex items-center justify-center gap-1"
+                                        title="Approve completed work"
+                                      >
+                                        <span>Approve</span>
+                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                          <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStatusChange(task._id, "In Progress")}
+                                        className="py-1.5 px-2 rounded bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/50 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 font-medium text-[11px] border border-slate-200 dark:border-slate-700 transition-colors"
+                                        title="Request revisions"
+                                      >
+                                        Revisions
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : task.status === "Approved" ? (
+                                  <div className="text-center py-1.5 px-2 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-[11px] font-semibold">
+                                    ✓ Approved by Company
+                                  </div>
+                                ) : task.status === "Completed" || task.status === "Done" ? (
+                                  <div className="text-center py-1.5 px-2 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold">
+                                    ✓ Work Completed
+                                  </div>
+                                ) : task.status === "In Progress" ? (
+                                  <div className="text-[11px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1.5 py-0.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                    <span>Developer actively working...</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-slate-400 dark:text-slate-500 italic py-0.5">
+                                    Awaiting developer to start
+                                  </div>
+                                )}
+
+                                {/* Card Footer: Details Link and Delete */}
+                                <div className="flex items-center justify-between pt-1">
+                                  <Link
+                                    to={`/tasks/${task._id}`}
+                                    className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                  >
+                                    View Task →
+                                  </Link>
+
+                                  {(currentUser?.role === "admin" ||
+                                    (currentUser?.role === "company" &&
+                                      ((activeProject?.owner?._id || activeProject?.owner) === currentUser?._id ||
+                                        (task.createdBy?._id || task.createdBy) === currentUser?._id))) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteTask(task._id)}
+                                      className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                      title="Delete task"
+                                    >
+                                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })
@@ -914,7 +1151,9 @@ const TaskBoard = () => {
                   >
                     <option value="Todo">Todo</option>
                     <option value="In Progress">In Progress</option>
-                    <option value="Done">Done</option>
+                    <option value="Submitted For Review">Submitted For Review</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Completed">Completed</option>
                   </select>
                 </div>
 
@@ -937,132 +1176,209 @@ const TaskBoard = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {(currentUser?.role === "admin" || currentUser?.role === "manager") && (
+                {(currentUser?.role === "admin" || currentUser?.role === "manager" || currentUser?.role === "company") && (
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                       Assign To
                     </label>
-                    <select
-                      value={formData.assignedTo}
-                      onChange={(e) =>
-                        setFormData({ ...formData, assignedTo: e.target.value })
-                      }
-                      className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
-                    >
-                      <option value="">Unassigned</option>
-                      {formData.assignedTo &&
-                        !availableUsers.some((u) => u._id === formData.assignedTo) && (
-                          <option value={formData.assignedTo}>
-                            {assignNameParam || "Selected User"}
-                          </option>
-                        )}
-                      {availableUsers.map((u) => {
-                        const roleFormatted = u.role
-                          ? u.role.charAt(0).toUpperCase() + u.role.slice(1)
-                          : "Developer";
-                        const skillsPreview =
-                          u.skills && u.skills.length > 0 ? ` • ${u.skills.slice(0, 3).join(", ")}` : "";
-                        return (
-                          <option key={u._id} value={u._id}>
-                            {u.name || u.email} ({roleFormatted}){skillsPreview}
-                          </option>
-                        );
-                      })}
-                    </select>
-
-                    {/* Task Assignment Decision-Support User Card */}
                     {(() => {
-                      const selectedUser = availableUsers.find(
-                        (u) => u._id === formData.assignedTo
-                      );
-                      if (!selectedUser) return null;
-
-                      const pendingCount =
-                        selectedUser.pendingTasks !== undefined
-                          ? selectedUser.pendingTasks
-                          : selectedUser.taskStats?.pending ?? 0;
-                      const completedCount =
-                        selectedUser.completedTasks !== undefined
-                          ? selectedUser.completedTasks
-                          : selectedUser.taskStats?.completed ?? 0;
+                      const isCompany = currentUser?.role === "company";
+                      const candidateUsers = isCompany
+                        ? (acceptedUsers.length > 0
+                            ? acceptedUsers
+                            : availableUsers.filter((u) => {
+                                const accIds = (activeProject?.developerResponses || [])
+                                  .filter((r) => r.status === "Accepted" || r.status === "In Progress")
+                                  .map((r) => (r.developer?._id || r.developer)?.toString());
+                                return accIds.includes(u._id?.toString());
+                              }))
+                        : availableUsers;
 
                       return (
-                        <div className="mt-2.5 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 text-xs space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-slate-800 dark:text-slate-200">
-                              {selectedUser.name || selectedUser.email}
-                            </span>
-                            <span className="text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                              {selectedUser.isActive !== false ? "Available" : "Unavailable"}
-                            </span>
-                          </div>
+                        <>
+                          <select
+                            value={formData.assignedTo}
+                            onChange={(e) =>
+                              setFormData({ ...formData, assignedTo: e.target.value })
+                            }
+                            className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                          >
+                            <option value="">Unassigned</option>
+                            {isCompany && candidateUsers.length > 0 && (
+                              <option value="ALL_ACCEPTED">
+                                👥 All Accepted Users ({candidateUsers.length} developers)
+                              </option>
+                            )}
+                            {formData.assignedTo &&
+                              formData.assignedTo !== "ALL_ACCEPTED" &&
+                              !candidateUsers.some((u) => u._id === formData.assignedTo) && (
+                                <option value={formData.assignedTo}>
+                                  {assignNameParam || "Selected Developer"}
+                                </option>
+                              )}
+                            {candidateUsers.map((u) => {
+                              const roleFormatted = u.role
+                                ? u.role.charAt(0).toUpperCase() + u.role.slice(1)
+                                : "Developer";
+                              const skillsPreview =
+                                u.skills && u.skills.length > 0 ? ` • ${u.skills.slice(0, 3).join(", ")}` : "";
+                              return (
+                                <option key={u._id} value={u._id}>
+                                  {u.name || u.email} ({roleFormatted}){skillsPreview}
+                                </option>
+                              );
+                            })}
+                          </select>
 
-                          {/* Email */}
-                          {selectedUser.email && (
-                            <div>
-                              <span className="text-slate-500 dark:text-slate-400 font-medium">Email: </span>
-                              <a
-                                href={`mailto:${selectedUser.email}`}
-                                className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline transition-colors"
-                              >
-                                <span>{selectedUser.email}</span>
-                              </a>
+                          {formData.assignedTo === "ALL_ACCEPTED" && (
+                            <div className="mt-2 p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-800 dark:text-indigo-300">
+                              <p className="font-semibold flex items-center gap-1.5">
+                                <span>👥 Multi-Developer Assignment</span>
+                              </p>
+                              <p className="text-[11px] mt-0.5 text-indigo-700/80 dark:text-indigo-400">
+                                This task will be created separately for all {candidateUsers.length} accepted developers. Each developer will have their own independent progress board and status tracking.
+                              </p>
                             </div>
                           )}
 
-                          {/* Bio */}
-                          <div>
-                            <span className="text-slate-500 dark:text-slate-400 font-medium">Bio: </span>
-                            <span className="text-slate-700 dark:text-slate-300 italic">
-                              {selectedUser.bio && selectedUser.bio.trim()
-                                ? `"${selectedUser.bio}"`
-                                : "No bio added yet"}
-                            </span>
-                          </div>
+                          {isCompany && candidateUsers.length === 0 && (
+                            <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-lg border border-amber-200 dark:border-amber-800/50">
+                              ⚠️ Only developers who have accepted this project invitation can be assigned tasks. No developers have accepted this project yet.
+                            </p>
+                          )}
 
-                          {/* Skills */}
-                          <div>
-                            <span className="text-slate-500 dark:text-slate-400 font-medium">Skills: </span>
-                            {selectedUser.skills && selectedUser.skills.length > 0 ? (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {selectedUser.skills.map((skill, i) => (
-                                  <span
-                                    key={i}
-                                    className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 text-[10px] font-medium"
-                                  >
-                                    {skill}
+                          {/* Task Assignment Decision-Support User Card */}
+                          {(() => {
+                            const selectedUser = availableUsers.find(
+                              (u) => u._id === formData.assignedTo
+                            );
+                            if (!selectedUser) return null;
+
+                            const pendingCount =
+                              selectedUser.pendingTasks !== undefined
+                                ? selectedUser.pendingTasks
+                                : selectedUser.taskStats?.pending ?? 0;
+                            const completedCount =
+                              selectedUser.completedTasks !== undefined
+                                ? selectedUser.completedTasks
+                                : selectedUser.taskStats?.completed ?? 0;
+
+                            return (
+                              <div className="mt-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 text-xs space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center border border-indigo-200 dark:border-indigo-800 shrink-0">
+                                      {selectedUser.name ? selectedUser.name.charAt(0).toUpperCase() : "D"}
+                                    </div>
+                                    <div>
+                                      <span className="font-semibold text-slate-800 dark:text-slate-200 block">
+                                        {selectedUser.name || selectedUser.email}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">
+                                        {selectedUser.email}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className="text-emerald-700 dark:text-emerald-400 font-medium text-[11px] flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    Accepted Dev
                                   </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 dark:text-slate-500 italic">No skills listed</span>
-                            )}
-                          </div>
+                                </div>
 
-                          {/* Task Counts and Profile Button */}
-                          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
-                            <div className="flex items-center gap-3 text-[11px]">
-                              <span>
-                                <strong className="text-amber-700 dark:text-amber-400">Pending:</strong> {pendingCount}
-                              </span>
-                              <span>
-                                <strong className="text-emerald-700 dark:text-emerald-400">Done:</strong> {completedCount}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setProfileModalUserId(selectedUser._id);
-                                setProfileModalUserObj(selectedUser);
-                                setIsProfileModalOpen(true);
-                              }}
-                              className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 text-[11px] font-medium transition-colors"
-                            >
-                              Profile View →
-                            </button>
-                          </div>
-                        </div>
+                                {/* Bio */}
+                                <div>
+                                  <span className="text-slate-500 dark:text-slate-400 font-medium">Bio: </span>
+                                  <span className="text-slate-700 dark:text-slate-300 italic">
+                                    {selectedUser.bio && selectedUser.bio.trim()
+                                      ? `"${selectedUser.bio}"`
+                                      : "No professional bio added yet"}
+                                  </span>
+                                </div>
+
+                                {/* Skills */}
+                                <div>
+                                  <span className="text-slate-500 dark:text-slate-400 font-medium">Skills: </span>
+                                  {selectedUser.skills && selectedUser.skills.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {selectedUser.skills.map((skill, i) => (
+                                        <span
+                                          key={i}
+                                          className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 text-[10px] font-medium"
+                                        >
+                                          {skill}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 dark:text-slate-500 italic">No skills listed</span>
+                                  )}
+                                </div>
+
+                                {/* Social Links: GitHub, LinkedIn, Portfolio */}
+                                {(selectedUser.github || selectedUser.linkedin || selectedUser.portfolio) && (
+                                  <div className="flex items-center gap-3 pt-1 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px]">
+                                    {selectedUser.github && (
+                                      <a
+                                        href={selectedUser.github.startsWith("http") ? selectedUser.github : `https://${selectedUser.github}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium inline-flex items-center gap-1"
+                                      >
+                                        <span>GitHub</span>
+                                        <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                                      </a>
+                                    )}
+                                    {selectedUser.linkedin && (
+                                      <a
+                                        href={selectedUser.linkedin.startsWith("http") ? selectedUser.linkedin : `https://${selectedUser.linkedin}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sky-600 dark:text-sky-400 hover:underline font-medium inline-flex items-center gap-1"
+                                      >
+                                        <span>LinkedIn</span>
+                                        <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                                      </a>
+                                    )}
+                                    {selectedUser.portfolio && (
+                                      <a
+                                        href={selectedUser.portfolio.startsWith("http") ? selectedUser.portfolio : `https://${selectedUser.portfolio}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium inline-flex items-center gap-1"
+                                      >
+                                        <span>Portfolio</span>
+                                        <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Task Counts and Profile Button */}
+                                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                                  <div className="flex items-center gap-3 text-[11px]">
+                                    <span>
+                                      <strong className="text-amber-700 dark:text-amber-400">Pending:</strong> {pendingCount}
+                                    </span>
+                                    <span>
+                                      <strong className="text-emerald-700 dark:text-emerald-400">Done:</strong> {completedCount}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setProfileModalUserId(selectedUser._id);
+                                      setProfileModalUserObj(selectedUser);
+                                      setIsProfileModalOpen(true);
+                                    }}
+                                    className="px-2.5 py-1 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 text-[11px] font-medium transition-colors"
+                                  >
+                                    Profile View →
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </>
                       );
                     })()}
                   </div>
@@ -1070,7 +1386,7 @@ const TaskBoard = () => {
 
                 <div
                   className={
-                    currentUser?.role === "admin" || currentUser?.role === "manager"
+                    currentUser?.role === "admin" || currentUser?.role === "manager" || currentUser?.role === "company"
                       ? ""
                       : "sm:col-span-2"
                   }

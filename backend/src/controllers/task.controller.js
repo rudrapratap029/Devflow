@@ -59,6 +59,36 @@ export const createTask = async (req, res, next) => {
       });
     }
 
+    // Developer is not allowed to create tasks
+    if (req.user.role === "developer") {
+      return res.status(403).json({
+        success: false,
+        message: "Developers are not authorized to create tasks"
+      });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isCompany = req.user.role === "company";
+    const isProjectOwner = existingProject.owner && existingProject.owner.toString() === req.user._id.toString();
+    const isProjectMember = existingProject.members && existingProject.members.some(
+      (memberId) => memberId.toString() === req.user._id.toString()
+    );
+
+    // Company can only create tasks inside its own projects
+    if (isCompany && !isProjectOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only create tasks in your own company's projects"
+      });
+    }
+
+    if (!isAdmin && !isProjectOwner && !isProjectMember) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You do not have permission to create tasks in this project"
+      });
+    }
+
     // Validate workspace if provided
     if (targetWorkspaceId) {
       if (!mongoose.Types.ObjectId.isValid(targetWorkspaceId)) {
@@ -75,27 +105,30 @@ export const createTask = async (req, res, next) => {
           message: "Workspace not found"
         });
       }
-    }
 
-    // Rule: Only project members can create tasks
-    const isProjectMember = existingProject.members.some(
-      (memberId) => memberId.toString() === req.user._id.toString()
-    );
-
-    if (!isProjectMember) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Only project members can create tasks"
-      });
+      if (isCompany && existingWorkspace.owner && existingWorkspace.owner.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: "You cannot create tasks in another company's workspace"
+        });
+      }
     }
 
     // Validate status if provided
     let taskStatus = "Todo";
+    const validStatuses = [
+      "Todo",
+      "In Progress",
+      "Submitted For Review",
+      "Approved",
+      "Completed",
+      "Done"
+    ];
     if (status) {
-      if (!["Todo", "In Progress", "Done"].includes(status)) {
+      if (!validStatuses.includes(status)) {
         return res.status(400).json({
           success: false,
-          message: "Status must be 'Todo', 'In Progress', or 'Done'"
+          message: `Status must be one of: ${validStatuses.join(", ")}`
         });
       }
       taskStatus = status;
@@ -113,7 +146,113 @@ export const createTask = async (req, res, next) => {
       taskPriority = priority;
     }
 
-    // Validate assignedTo if provided (must be a member of the project)
+    // Automatically derive workspace from project if not explicitly supplied
+    const taskWorkspaceId = targetWorkspaceId || existingProject.workspace;
+
+    // Helper: collect developers who have accepted the project invitation
+    const getAcceptedDeveloperIds = (proj) => {
+      const ids = [];
+      if (Array.isArray(proj.developerResponses)) {
+        proj.developerResponses.forEach((resp) => {
+          if (
+            (resp.status === "Accepted" || resp.status === "In Progress") &&
+            resp.developer
+          ) {
+            const devIdStr = (resp.developer._id || resp.developer).toString();
+            if (!ids.includes(devIdStr)) {
+              ids.push(devIdStr);
+            }
+          }
+        });
+      }
+      return ids;
+    };
+
+    // Case 1: Company selects "All Accepted Users"
+    if (assignedTo === "ALL_ACCEPTED" || req.body.assignToAll === true) {
+      const acceptedDevIds = getAcceptedDeveloperIds(existingProject);
+
+      if (acceptedDevIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "No developers have accepted this project yet. Tasks can only be assigned to developers who have accepted the project invitation."
+        });
+      }
+
+      // Create a separate task for every accepted developer
+      const createdTasks = [];
+      for (const devId of acceptedDevIds) {
+        // Ensure developer is in project members
+        if (
+          !existingProject.members.some(
+            (m) => m.toString() === devId.toString()
+          )
+        ) {
+          existingProject.members.push(devId);
+        }
+
+        const newTask = await Task.create({
+          title: title.trim(),
+          description: description ? description.trim() : "",
+          project: targetProjectId,
+          workspace: taskWorkspaceId,
+          assignedTo: devId,
+          createdBy: req.user._id,
+          status: taskStatus,
+          priority: taskPriority,
+          dueDate: dueDate ? new Date(dueDate) : null
+        });
+
+        createdTasks.push(newTask);
+
+        // Activity log
+        await ActivityLog.create({
+          user: req.user._id,
+          project: targetProjectId,
+          task: newTask._id,
+          action: "TASK_CREATED",
+          description: `${req.user.name || "Company"} created task "${newTask.title}" for accepted developer`
+        });
+
+        await ActivityLog.create({
+          user: req.user._id,
+          project: targetProjectId,
+          task: newTask._id,
+          action: "TASK_ASSIGNED",
+          description: `${req.user.name || "Company"} assigned task "${newTask.title}"`
+        });
+
+        // Notification to developer
+        try {
+          const notification = await Notification.create({
+            recipient: devId,
+            sender: req.user._id,
+            type: "TASK_ASSIGNED",
+            message: `${req.user.companyName || req.user.name || "Company"} assigned you a new task: ${newTask.title}`,
+            task: newTask._id,
+            project: targetProjectId
+          });
+          emitNotification(devId, notification);
+        } catch (notifErr) {
+          console.warn("Failed to notify developer:", notifErr.message);
+        }
+      }
+
+      await existingProject.save();
+
+      return res.status(201).json({
+        success: true,
+        message: `Task successfully created and assigned to all ${createdTasks.length} accepted developer(s)`,
+        data: {
+          tasks: createdTasks,
+          task: createdTasks[0],
+          count: createdTasks.length
+        }
+      });
+    }
+
+    // Case 2: Individual assignment or unassigned
     let assignedUserId = null;
     if (assignedTo) {
       if (!mongoose.Types.ObjectId.isValid(assignedTo)) {
@@ -131,22 +270,46 @@ export const createTask = async (req, res, next) => {
         });
       }
 
-      const isAssignedMember = existingProject.members.some(
-        (memberId) => memberId.toString() === assignedTo.toString()
-      );
-
-      if (!isAssignedMember) {
-        return res.status(400).json({
-          success: false,
-          message: "Assigned user must be a member of this project"
-        });
+      // If Company assigns to an individual user, enforce that the developer accepted the project invitation
+      if (isCompany) {
+        const acceptedDevIds = getAcceptedDeveloperIds(existingProject);
+        if (!acceptedDevIds.includes(assignedTo.toString())) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "You can only assign tasks to developers who have accepted the project invitation."
+          });
+        }
       }
 
+      // Add assigned user to project members if not already present
+      const isAssignedMember =
+        existingProject.members.some(
+          (memberId) => memberId.toString() === assignedTo.toString()
+        ) ||
+        (existingProject.owner &&
+          existingProject.owner.toString() === assignedTo.toString());
+
+      if (!isAssignedMember) {
+        existingProject.members.push(assignedTo);
+      }
+
+      if (isCompany && Array.isArray(existingProject.developerResponses)) {
+        const respIdx = existingProject.developerResponses.findIndex(
+          (r) =>
+            (r.developer?._id || r.developer).toString() ===
+            assignedTo.toString()
+        );
+        if (respIdx >= 0) {
+          if (existingProject.developerResponses[respIdx].status === "Pending") {
+            existingProject.developerResponses[respIdx].status = "Accepted";
+          }
+        }
+      }
+
+      await existingProject.save();
       assignedUserId = assignedTo;
     }
-
-    // Automatically derive workspace from project if not explicitly supplied
-    const taskWorkspaceId = targetWorkspaceId || existingProject.workspace;
 
     const task = await Task.create({
       title: title.trim(),
@@ -180,14 +343,19 @@ export const createTask = async (req, res, next) => {
 
       // Create notification for assigned user (if not self-assigned)
       if (assignedUserId.toString() !== req.user._id.toString()) {
-        const notification = await Notification.create({
-          recipient: assignedUserId,
-          sender: req.user._id,
-          type: "TASK_ASSIGNED",
-          message: `${req.user.name || "User"} assigned you a new task: ${task.title}`,
-          task: task._id
-        });
-        emitNotification(assignedUserId, notification);
+        try {
+          const notification = await Notification.create({
+            recipient: assignedUserId,
+            sender: req.user._id,
+            type: "TASK_ASSIGNED",
+            message: `${req.user.companyName || req.user.name || "User"} assigned you a new task: ${task.title}`,
+            task: task._id,
+            project: targetProjectId
+          });
+          emitNotification(assignedUserId, notification);
+        } catch (notifErr) {
+          console.warn("Failed to notify assigned user:", notifErr.message);
+        }
       }
     }
 
@@ -195,7 +363,8 @@ export const createTask = async (req, res, next) => {
       success: true,
       message: "Task created successfully",
       data: {
-        task
+        task,
+        tasks: [task]
       }
     });
   } catch (error) {
@@ -208,42 +377,95 @@ export const createTask = async (req, res, next) => {
 // @access  Private
 export const getTasks = async (req, res, next) => {
   try {
-    // 1. Find all projects where the logged-in user is a member
-    const userProjects = await Project.find({ members: req.user._id }).select("_id");
-    const userProjectIds = userProjects.map((p) => p._id);
+    const isAdmin = req.user.role === "admin";
+    const isCompany = req.user.role === "company";
+    const isDeveloper = req.user.role === "developer";
 
-    // 2. Base query: tasks belonging to user's projects
-    const filter = { project: { $in: userProjectIds } };
+    let filter = {};
+
+    if (isAdmin) {
+      // Admin sees all tasks across all projects and workspaces
+      filter = {};
+    } else if (isCompany) {
+      // Company only sees tasks in projects it owns or belongs to
+      const companyProjects = await Project.find({
+        $or: [{ owner: req.user._id }, { members: req.user._id }]
+      }).select("_id");
+      const companyProjectIds = companyProjects.map((p) => p._id);
+      filter = { project: { $in: companyProjectIds } };
+    } else if (isDeveloper) {
+      // Developer only sees tasks assigned to them
+      filter = { assignedTo: req.user._id };
+    } else {
+      // Default: project members
+      const userProjects = await Project.find({ members: req.user._id }).select("_id");
+      const userProjectIds = userProjects.map((p) => p._id);
+      filter = { project: { $in: userProjectIds } };
+    }
 
     // Optional filter: project
     const projectFilter = req.query.project || req.query.projectId;
     if (projectFilter && mongoose.Types.ObjectId.isValid(projectFilter)) {
-      // Ensure the requested project is one the user is a member of
-      const isMemberOfFilteredProject = userProjectIds.some(
-        (id) => id.toString() === projectFilter.toString()
-      );
-
-      if (isMemberOfFilteredProject) {
+      if (isAdmin) {
         filter.project = projectFilter;
-      } else {
-        // User requested a project they don't belong to: return empty list
-        return res.status(200).json({
-          success: true,
-          message: "Tasks fetched successfully",
-          data: {
-            tasks: [],
-            pagination: {
-              currentPage: 1,
-              totalPages: 0,
-              totalTasks: 0
+      } else if (isCompany) {
+        const companyProjects = await Project.find({
+          $or: [{ owner: req.user._id }, { members: req.user._id }]
+        }).select("_id");
+        const companyProjectIds = companyProjects.map((p) => p._id.toString());
+        if (companyProjectIds.includes(projectFilter.toString())) {
+          filter.project = projectFilter;
+        } else {
+          return res.status(200).json({
+            success: true,
+            message: "Tasks fetched successfully",
+            data: {
+              tasks: [],
+              pagination: {
+                currentPage: 1,
+                totalPages: 0,
+                totalTasks: 0
+              }
             }
-          }
-        });
+          });
+        }
+      } else if (isDeveloper) {
+        filter.project = projectFilter;
+        filter.assignedTo = req.user._id;
+      } else {
+        const userProjects = await Project.find({ members: req.user._id }).select("_id");
+        const userProjectIds = userProjects.map((p) => p._id.toString());
+        if (userProjectIds.includes(projectFilter.toString())) {
+          filter.project = projectFilter;
+        } else {
+          return res.status(200).json({
+            success: true,
+            message: "Tasks fetched successfully",
+            data: {
+              tasks: [],
+              pagination: {
+                currentPage: 1,
+                totalPages: 0,
+                totalTasks: 0
+              }
+            }
+          });
+        }
       }
     }
 
     // Optional filter: status
-    if (req.query.status && ["Todo", "In Progress", "Done"].includes(req.query.status)) {
+    if (
+      req.query.status &&
+      [
+        "Todo",
+        "In Progress",
+        "Submitted For Review",
+        "Approved",
+        "Completed",
+        "Done"
+      ].includes(req.query.status)
+    ) {
       filter.status = req.query.status;
     }
 
@@ -252,12 +474,13 @@ export const getTasks = async (req, res, next) => {
       filter.priority = req.query.priority;
     }
 
-    // Optional filter: assignedTo
-    if (req.query.assignedTo) {
+    // Optional filter: assignedTo (developers cannot change this)
+    if (isDeveloper) {
+      filter.assignedTo = req.user._id;
+    } else if (req.query.assignedTo) {
       if (mongoose.Types.ObjectId.isValid(req.query.assignedTo)) {
         filter.assignedTo = req.query.assignedTo;
       } else {
-        // Non-matching assignedTo when invalid user ID is provided
         filter.assignedTo = new mongoose.Types.ObjectId();
       }
     }
@@ -274,7 +497,7 @@ export const getTasks = async (req, res, next) => {
 
     // Pagination
     const page = parseInt(req.query.page, 10) > 0 ? parseInt(req.query.page, 10) : 1;
-    const limit = parseInt(req.query.limit, 10) > 0 ? parseInt(req.query.limit, 10) : 10;
+    const limit = parseInt(req.query.limit, 10) > 0 ? parseInt(req.query.limit, 10) : 50;
     const skip = (page - 1) * limit;
 
     const totalTasks = await Task.countDocuments(filter);
@@ -334,16 +557,57 @@ export const getTaskById = async (req, res, next) => {
       });
     }
 
-    // Check if logged-in user is a member of the task's project
-    const isMember = task.project.members.some(
-      (memberId) => memberId.toString() === req.user._id.toString()
-    );
+    const isAdmin = req.user.role === "admin";
+    const isCompany = req.user.role === "company";
+    const isDeveloper = req.user.role === "developer";
 
-    if (!isMember) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. You are not a member of this project"
-      });
+    const isProjectOwner =
+      task.project?.owner &&
+      (task.project.owner._id
+        ? task.project.owner._id.toString()
+        : task.project.owner.toString()) === req.user._id.toString();
+
+    const isMember =
+      task.project?.members &&
+      task.project.members.some(
+        (memberId) => (memberId._id ? memberId._id.toString() : memberId.toString()) === req.user._id.toString()
+      );
+
+    const isCreator =
+      task.createdBy &&
+      (task.createdBy._id
+        ? task.createdBy._id.toString()
+        : task.createdBy.toString()) === req.user._id.toString();
+
+    const isAssigned =
+      task.assignedTo &&
+      (task.assignedTo._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo.toString()) === req.user._id.toString();
+
+    if (isAdmin) {
+      // Admin has full access to view all tasks
+    } else if (isCompany) {
+      if (!isProjectOwner && !isCreator && !isMember) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. You do not have permission to view tasks in another company's project"
+        });
+      }
+    } else if (isDeveloper) {
+      if (!isAssigned) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. You can only view tasks assigned to you"
+        });
+      }
+    } else {
+      if (!isMember && !isProjectOwner && !isCreator && !isAssigned) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. You are not a member of this project"
+        });
+      }
     }
 
     return res.status(200).json({
@@ -387,12 +651,62 @@ export const updateTask = async (req, res, next) => {
 
     // Role and ownership authorization
     const isAdmin = req.user.role === "admin";
+    const isCompany = req.user.role === "company";
+    const isDeveloper = req.user.role === "developer";
     const isManager = req.user.role === "manager";
-    const isCreator = task.createdBy.toString() === req.user._id.toString();
-    const isProjectOwner = task.project?.owner?.toString() === req.user._id.toString();
-    const isAssigned = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
 
-    if (!isAdmin && !isManager && !isCreator && !isProjectOwner && !isAssigned) {
+    const isCreator =
+      task.createdBy &&
+      (task.createdBy._id
+        ? task.createdBy._id.toString()
+        : task.createdBy.toString()) === req.user._id.toString();
+
+    const isProjectOwner =
+      task.project?.owner &&
+      (task.project.owner._id
+        ? task.project.owner._id.toString()
+        : task.project.owner.toString()) === req.user._id.toString();
+
+    const isAssigned =
+      task.assignedTo &&
+      (task.assignedTo._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo.toString()) === req.user._id.toString();
+
+    // 1. Developers can ONLY edit status of tasks assigned to them
+    if (isDeveloper) {
+      if (!isAssigned) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not authorized to update another user's task"
+        });
+      }
+
+      const { title, description, priority, dueDate, assignedTo } = req.body || {};
+      if (
+        title !== undefined ||
+        description !== undefined ||
+        priority !== undefined ||
+        dueDate !== undefined ||
+        assignedTo !== undefined
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Developers can only update task status"
+        });
+      }
+    }
+
+    // 2. Company can only manage tasks in its own projects
+    if (isCompany && !isProjectOwner && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to edit another company's task"
+      });
+    }
+
+    // 3. General authorization check
+    if (!isAdmin && !isCompany && !isManager && !isCreator && !isProjectOwner && !isAssigned) {
       return res.status(403).json({
         success: false,
         message: "You are not authorized to perform this action"
@@ -407,24 +721,6 @@ export const updateTask = async (req, res, next) => {
       dueDate,
       assignedTo
     } = req.body || {};
-
-    // Developers can only update status of their own assigned tasks
-    if (req.user.role === "developer" && !isAdmin && !isManager && !isProjectOwner && !isCreator) {
-      // Developer cannot reassign tasks to others
-      if (assignedTo !== undefined) {
-        return res.status(403).json({
-          success: false,
-          message: "You are not authorized to perform this action"
-        });
-      }
-      // Developer cannot change title, description, priority, or due date
-      if (title !== undefined || description !== undefined || priority !== undefined || dueDate !== undefined) {
-        return res.status(403).json({
-          success: false,
-          message: "You are not authorized to perform this action"
-        });
-      }
-    }
 
     let generalUpdated = false;
 
@@ -446,15 +742,83 @@ export const updateTask = async (req, res, next) => {
       generalUpdated = true;
     }
 
-    // Allow updating: status
+    // Allow updating: status (Allowed: Todo, In Progress, Submitted For Review, Approved, Completed, Done)
+    const validStatuses = [
+      "Todo",
+      "In Progress",
+      "Submitted For Review",
+      "Approved",
+      "Completed",
+      "Done"
+    ];
     if (status !== undefined) {
-      if (!["Todo", "In Progress", "Done"].includes(status)) {
+      if (!validStatuses.includes(status)) {
         return res.status(400).json({
           success: false,
-          message: "Status must be 'Todo', 'In Progress', or 'Done'"
+          message: `Status must be one of: ${validStatuses.join(", ")}`
         });
       }
-      task.status = status;
+
+      const normalizedStatus = status === "Done" ? "Completed" : status;
+
+      // 1. Developer Role Restrictions:
+      // Developer can ONLY transition: Todo -> In Progress -> Submitted For Review
+      // Developer CANNOT directly mark task as Approved or Completed
+      if (isDeveloper) {
+        if (normalizedStatus === "Approved" || normalizedStatus === "Completed") {
+          return res.status(403).json({
+            success: false,
+            message: "Developers cannot directly mark tasks as Approved or Completed. Please submit your task for company review."
+          });
+        }
+
+        const devAllowedTransitions = {
+          "Todo": ["In Progress"],
+          "In Progress": ["Submitted For Review", "Todo"],
+          "Submitted For Review": ["Submitted For Review"], // Idempotent
+          "Approved": ["Approved"],
+          "Completed": ["Completed"]
+        };
+
+        const allowed = devAllowedTransitions[previousStatus] || ["Todo", "In Progress", "Submitted For Review"];
+        if (!allowed.includes(normalizedStatus) && previousStatus !== normalizedStatus) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid developer status transition from "${previousStatus}" to "${normalizedStatus}". Workflow is: Todo -> In Progress -> Submitted For Review.`
+          });
+        }
+      }
+
+      // 2. Company Role Restrictions:
+      // Company cannot change developer work status before submission (Todo or In Progress)
+      // Company can change status: Submitted For Review -> Approved -> Completed
+      if (isCompany) {
+        if (previousStatus === "Todo" || previousStatus === "In Progress") {
+          return res.status(403).json({
+            success: false,
+            message: "Company cannot change developer work status before submission. Task is currently in progress by the developer."
+          });
+        }
+
+        const companyAllowedStatuses = ["Approved", "Completed", "In Progress"];
+        if (!companyAllowedStatuses.includes(normalizedStatus)) {
+          return res.status(403).json({
+            success: false,
+            message: "Companies can only review submitted tasks (Approved, Completed, or Request Revisions)."
+          });
+        }
+      }
+
+      task.status = normalizedStatus;
+
+      // Save respective lifecycle timestamps
+      if (normalizedStatus === "Submitted For Review") {
+        task.submittedAt = new Date();
+      } else if (normalizedStatus === "Approved") {
+        task.approvedAt = new Date();
+      } else if (normalizedStatus === "Completed") {
+        task.completedAt = new Date();
+      }
     }
 
     // Allow updating: priority
@@ -475,7 +839,7 @@ export const updateTask = async (req, res, next) => {
       generalUpdated = true;
     }
 
-    // Allow updating: assignedTo (must be a member of the project)
+    // Allow updating: assignedTo
     if (assignedTo !== undefined) {
       if (assignedTo === null || assignedTo === "") {
         task.assignedTo = null;
@@ -495,14 +859,30 @@ export const updateTask = async (req, res, next) => {
           });
         }
 
-        const isAssignedMember = task.project.members.some(
-          (memberId) => memberId.toString() === assignedTo.toString()
-        );
+        // If company role, ensure developer has accepted the project invitation
+        if (isCompany && task.project) {
+          const proj = await Project.findById(task.project._id || task.project);
+          const isAccepted =
+            Array.isArray(proj?.developerResponses) &&
+            proj.developerResponses.some(
+              (r) =>
+                (r.status === "Accepted" || r.status === "In Progress") &&
+                (r.developer?._id || r.developer).toString() ===
+                  assignedTo.toString()
+            );
 
-        if (!isAssignedMember) {
-          return res.status(400).json({
-            success: false,
-            message: "Assigned user must be a member of this project"
+          if (!isAccepted) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "You can only assign tasks to developers who have accepted the project invitation."
+            });
+          }
+        }
+
+        if (task.project && task.project._id) {
+          await Project.findByIdAndUpdate(task.project._id, {
+            $addToSet: { members: assignedTo }
           });
         }
 
@@ -512,7 +892,7 @@ export const updateTask = async (req, res, next) => {
 
     await task.save();
 
-    await task.populate("project", "name");
+    await task.populate("project", "name owner");
     await task.populate("workspace", "name");
     await task.populate("assignedTo", "name email avatar profilePicture skills");
     await task.populate("createdBy", "name email avatar profilePicture");
@@ -542,7 +922,8 @@ export const updateTask = async (req, res, next) => {
           sender: req.user._id,
           type: "TASK_ASSIGNED",
           message: `${req.user.name || "User"} assigned you a new task: ${task.title}`,
-          task: task._id
+          task: task._id,
+          project: taskProjectId
         });
         emitNotification(assignedUserId, notification);
       }
@@ -550,43 +931,91 @@ export const updateTask = async (req, res, next) => {
 
     // Log activity & Create Notification: Task Status Changed
     if (status !== undefined) {
+      let actionName = "TASK_STATUS_CHANGED";
+      let activityDesc = `${req.user.name || "User"} changed status of task "${task.title}" to ${task.status}`;
+
+      if (task.status === "Submitted For Review") {
+        actionName = "TASK_SUBMITTED_FOR_REVIEW";
+        activityDesc = `${req.user.name || "Developer"} submitted task "${task.title}" for review`;
+      } else if (task.status === "Approved") {
+        actionName = "TASK_APPROVED";
+        activityDesc = `${req.user.companyName || req.user.name || "Company"} approved task "${task.title}"`;
+      } else if (task.status === "Completed") {
+        actionName = "TASK_COMPLETED";
+        activityDesc = `${req.user.companyName || req.user.name || "Company"} marked task "${task.title}" as Completed`;
+      } else if (task.status === "In Progress" && previousStatus === "Submitted For Review") {
+        actionName = "TASK_REVISION_REQUESTED";
+        activityDesc = `${req.user.companyName || req.user.name || "Company"} requested revisions on task "${task.title}"`;
+      }
+
       await ActivityLog.create({
         user: req.user._id,
         project: taskProjectId,
         task: task._id,
-        action: "TASK_STATUS_CHANGED",
-        description: `${req.user.name || "User"} changed status of task "${task.title}" to ${task.status}`
+        action: actionName,
+        description: activityDesc
       });
 
-      // Notify task creator and assigned user (if exists)
-      const recipientsToNotify = new Set();
-      const creatorId = task.createdBy?._id
-        ? task.createdBy._id.toString()
-        : task.createdBy
-        ? task.createdBy.toString()
-        : null;
-      const assigneeId = task.assignedTo?._id
-        ? task.assignedTo._id.toString()
-        : task.assignedTo
-        ? task.assignedTo.toString()
-        : null;
+      // Target notifications
+      if (task.status === "Submitted For Review") {
+        // Send notification to project owner / company
+        const ownerId = task.project?.owner?._id
+          ? task.project.owner._id.toString()
+          : task.project?.owner
+          ? task.project.owner.toString()
+          : task.createdBy?._id
+          ? task.createdBy._id.toString()
+          : task.createdBy?.toString();
 
-      if (creatorId) {
-        recipientsToNotify.add(creatorId);
-      }
-      if (assigneeId) {
-        recipientsToNotify.add(assigneeId);
-      }
+        if (ownerId && ownerId !== req.user._id.toString()) {
+          try {
+            const notification = await Notification.create({
+              recipient: ownerId,
+              sender: req.user._id,
+              type: "TASK_STATUS_CHANGED",
+              message: `${req.user.name || "Developer"} has submitted task "${task.title}" for review`,
+              task: task._id,
+              project: taskProjectId
+            });
+            emitNotification(ownerId, notification);
+          } catch (notifErr) {
+            console.warn("Failed to notify project owner:", notifErr.message);
+          }
+        }
+      } else if (
+        task.status === "Approved" ||
+        task.status === "Completed" ||
+        (task.status === "In Progress" && previousStatus === "Submitted For Review")
+      ) {
+        // Send notification to developer
+        const devId = task.assignedTo?._id
+          ? task.assignedTo._id.toString()
+          : task.assignedTo
+          ? task.assignedTo.toString()
+          : null;
 
-      for (const recipientId of recipientsToNotify) {
-        const notification = await Notification.create({
-          recipient: recipientId,
-          sender: req.user._id,
-          type: "TASK_STATUS_CHANGED",
-          message: `Task ${task.title} status changed to ${task.status}`,
-          task: task._id
-        });
-        emitNotification(recipientId, notification);
+        if (devId && devId !== req.user._id.toString()) {
+          try {
+            let msg = `Your task "${task.title}" has been approved by ${req.user.companyName || req.user.name || "the company"}!`;
+            if (task.status === "Completed") {
+              msg = `Task "${task.title}" has been marked Completed.`;
+            } else if (task.status === "In Progress") {
+              msg = `${req.user.companyName || req.user.name || "Company"} requested revisions on task "${task.title}".`;
+            }
+
+            const notification = await Notification.create({
+              recipient: devId,
+              sender: req.user._id,
+              type: "TASK_STATUS_CHANGED",
+              message: msg,
+              task: task._id,
+              project: taskProjectId
+            });
+            emitNotification(devId, notification);
+          } catch (notifErr) {
+            console.warn("Failed to notify developer of status change:", notifErr.message);
+          }
+        }
       }
     }
 
@@ -639,9 +1068,35 @@ export const deleteTask = async (req, res, next) => {
 
     // Authorization: Admin, Manager, Project Owner, or Task Creator
     const isAdmin = req.user.role === "admin";
+    const isCompany = req.user.role === "company";
+    const isDeveloper = req.user.role === "developer";
     const isManager = req.user.role === "manager";
-    const isCreator = task.createdBy.toString() === req.user._id.toString();
-    const isProjectOwner = task.project?.owner?.toString() === req.user._id.toString();
+    const isCreator =
+      task.createdBy &&
+      (task.createdBy._id
+        ? task.createdBy._id.toString()
+        : task.createdBy.toString()) === req.user._id.toString();
+    const isProjectOwner =
+      task.project?.owner &&
+      (task.project.owner._id
+        ? task.project.owner._id.toString()
+        : task.project.owner.toString()) === req.user._id.toString();
+
+    // Developers cannot delete tasks
+    if (isDeveloper) {
+      return res.status(403).json({
+        success: false,
+        message: "Developers are not authorized to delete tasks"
+      });
+    }
+
+    // Company cannot delete another company's task
+    if (isCompany && !isProjectOwner && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to delete another company's task"
+      });
+    }
 
     if (!isAdmin && !isManager && !isCreator && !isProjectOwner) {
       return res.status(403).json({

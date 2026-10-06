@@ -55,9 +55,13 @@ const Projects = () => {
     name: "",
     description: "",
     status: "Active",
+    industry: "",
     requiredSkills: "",
-    experienceLevel: "All Levels",
-    deadline: ""
+    experienceLevel: "Fresher",
+    duration: "",
+    deadline: "",
+    developersRequired: 1,
+    budget: ""
   });
   const [editProjectLoading, setEditProjectLoading] = useState(false);
   const [editProjectError, setEditProjectError] = useState("");
@@ -68,9 +72,13 @@ const Projects = () => {
     name: "",
     description: "",
     workspace: workspaceQuery || "",
+    industry: user?.industry || "",
     requiredSkills: "",
-    experienceLevel: "All Levels",
-    deadline: ""
+    experienceLevel: "Fresher",
+    duration: "",
+    deadline: "",
+    developersRequired: 1,
+    budget: ""
   });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -425,9 +433,13 @@ const Projects = () => {
       name: proj.name || "",
       description: proj.description || "",
       status: proj.status || "Active",
+      industry: proj.industry || proj.companyDetails?.industry || "",
       requiredSkills: Array.isArray(proj.requiredSkills) ? proj.requiredSkills.join(", ") : (proj.requiredSkills || ""),
-      experienceLevel: proj.experienceLevel || "All Levels",
-      deadline: proj.deadline || ""
+      experienceLevel: proj.experienceLevel || "Fresher",
+      duration: proj.duration || "",
+      deadline: proj.deadline || "",
+      developersRequired: proj.developersRequired || 1,
+      budget: proj.budget || ""
     });
     setEditProjectError("");
     setShowEditProjectModal(true);
@@ -506,9 +518,13 @@ const Projects = () => {
           name: "",
           description: "",
           workspace: workspaces[0]?._id || "",
+          industry: user?.industry || "",
           requiredSkills: "",
-          experienceLevel: "All Levels",
-          deadline: ""
+          experienceLevel: "Fresher",
+          duration: "",
+          deadline: "",
+          developersRequired: 1,
+          budget: ""
         });
         setShowModal(false);
         fetchData();
@@ -888,6 +904,19 @@ const Projects = () => {
                                   Reject
                                 </button>
                               )}
+                              <button
+                                type="button"
+                                disabled={respondingId === proj._id}
+                                onClick={() => handleDeveloperResponse(proj._id, "Pending")}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                                  myStatus === "Pending"
+                                    ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                                    : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                }`}
+                                title="Decide Later (Keeps project Pending)"
+                              >
+                                Later
+                              </button>
                             </>
                           )}
 
@@ -1018,9 +1047,39 @@ const Projects = () => {
               </div>
             )}
 
-            <form onSubmit={handleCreateProject} className="space-y-4">
+            {/* Company Banner */}
+            {(user?.role === "company" || user?.companyName) && (
+              <div className="mb-4 p-3 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/60 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5">
+                  {user?.companyLogo ? (
+                    <img
+                      src={user.companyLogo}
+                      alt="Logo"
+                      className="w-7 h-7 rounded object-contain bg-white border border-slate-200"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded bg-indigo-600 text-white font-bold text-xs flex items-center justify-center">
+                      {(user?.companyName || user?.name || "C")[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-semibold text-slate-900 dark:text-white block">
+                      {user?.companyName || user?.name}
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Official Company Post • {user?.industry || "Tech"}
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-semibold">
+                  Verified
+                </span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateProject} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
                   Workspace *
                 </label>
                 <select
@@ -1029,7 +1088,7 @@ const Projects = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, workspace: e.target.value })
                   }
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                 >
                   {workspaces.map((ws) => (
                     <option key={ws._id} value={ws._id}>
@@ -1040,7 +1099,7 @@ const Projects = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
                   Project Title *
                 </label>
                 <input
@@ -1050,29 +1109,62 @@ const Projects = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="e.g. MERN Stack E-Commerce Portal"
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  placeholder="e.g. MERN CRM Dashboard"
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+                    Industry
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.industry}
+                    onChange={(e) =>
+                      setFormData({ ...formData, industry: e.target.value })
+                    }
+                    placeholder="e.g. SaaS, Fintech, AI"
+                    className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+                    Experience Level
+                  </label>
+                  <select
+                    value={formData.experienceLevel}
+                    onChange={(e) =>
+                      setFormData({ ...formData, experienceLevel: e.target.value })
+                    }
+                    className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  >
+                    <option value="Fresher">Fresher</option>
+                    <option value="1–2 Years">1–2 Years</option>
+                    <option value="3+ Years">3+ Years</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
                   Description *
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   required
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
                   placeholder="Detailed requirements, deliverables, and architecture expectations..."
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
                   Required Skills (Comma separated)
                 </label>
                 <input
@@ -1081,31 +1173,28 @@ const Projects = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, requiredSkills: e.target.value })
                   }
-                  placeholder="e.g. React, Node.js, MongoDB, TypeScript"
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  placeholder="e.g. React, Node.js, MongoDB"
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
-                    Experience Level
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+                    Duration
                   </label>
-                  <select
-                    value={formData.experienceLevel}
+                  <input
+                    type="text"
+                    value={formData.duration}
                     onChange={(e) =>
-                      setFormData({ ...formData, experienceLevel: e.target.value })
+                      setFormData({ ...formData, duration: e.target.value })
                     }
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
-                  >
-                    <option value="All Levels">All Levels</option>
-                    <option value="Beginner / Junior">Beginner / Junior</option>
-                    <option value="Intermediate">Intermediate</option>
-                    <option value="Senior / Lead">Senior / Lead</option>
-                  </select>
+                    placeholder="e.g. 15 Days"
+                    className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
                     Deadline
                   </label>
                   <input
@@ -1114,10 +1203,39 @@ const Projects = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, deadline: e.target.value })
                     }
-                    placeholder="e.g. 15 Days or 2026-11-15"
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                    placeholder="e.g. 15 Days"
+                    className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+                    Developers Req.
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.developersRequired}
+                    onChange={(e) =>
+                      setFormData({ ...formData, developersRequired: e.target.value })
+                    }
+                    className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+                  Budget (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.budget}
+                  onChange={(e) =>
+                    setFormData({ ...formData, budget: e.target.value })
+                  }
+                  placeholder="e.g. $1,500 / Fixed"
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+                />
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-2">
@@ -1133,7 +1251,7 @@ const Projects = () => {
                   disabled={createLoading}
                   className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 shadow-xs"
                 >
-                  {createLoading ? "Creating..." : "Create Project"}
+                  {createLoading ? "Publishing Project..." : "Publish Project"}
                 </button>
               </div>
             </form>
@@ -1729,47 +1847,130 @@ const Projects = () => {
                 </div>
 
                 {selectedProject.developerResponses && selectedProject.developerResponses.length > 0 ? (
-                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                     {selectedProject.developerResponses.map((resp, rIdx) => {
                       const dev = resp.developer || {};
                       const devName = dev.name || "Developer";
                       const devEmail = dev.email || "";
+                      const devAvatar = dev.profilePicture || dev.avatar || "";
+                      const isAccepted = resp.status === "Accepted";
+
                       return (
                         <div
                           key={resp._id || rIdx}
-                          className="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 text-xs space-y-2"
+                          className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-2.5 shadow-2xs"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
-                                {devName.charAt(0).toUpperCase()}
-                              </div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                              {devAvatar ? (
+                                <img
+                                  src={devAvatar.startsWith("http") ? devAvatar : `${BACKEND_BASE_URL}${devAvatar.startsWith("/") ? "" : "/"}${devAvatar}`}
+                                  alt={devName}
+                                  className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center border border-indigo-200 dark:border-indigo-800 shrink-0">
+                                  {devName.charAt(0).toUpperCase()}
+                                </div>
+                              )}
                               <div>
-                                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
                                   {devName}
                                 </span>
                                 {devEmail && (
-                                  <span className="text-[11px] text-slate-400 ml-1.5">
-                                    ({devEmail})
+                                  <span className="text-[11px] text-slate-400 block">
+                                    {devEmail}
                                   </span>
                                 )}
                               </div>
                             </div>
 
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                              resp.status === "Accepted"
-                                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-                                : resp.status === "Rejected"
-                                ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
-                                : resp.status === "In Progress"
-                                ? "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800"
-                                : resp.status === "Submitted"
-                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
-                                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                            }`}>
-                              {resp.status}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                resp.status === "Accepted"
+                                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                                  : resp.status === "Rejected"
+                                  ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
+                                  : resp.status === "In Progress"
+                                  ? "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800"
+                                  : resp.status === "Submitted"
+                                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                              }`}>
+                                {resp.status}
+                              </span>
+
+                              {isAccepted && (user?.role === "company" || user?.role === "admin") && (
+                                <Link
+                                  to={`/task-board?project=${selectedProject._id}&assignTo=${dev._id || dev}&assignName=${encodeURIComponent(devName)}`}
+                                  className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] shadow-2xs transition-colors inline-flex items-center gap-1"
+                                >
+                                  <span>Assign Task</span>
+                                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                </Link>
+                              )}
+                            </div>
                           </div>
+
+                          {/* Bio */}
+                          {dev.bio && (
+                            <p className="text-slate-600 dark:text-slate-300 text-xs italic">
+                              "{dev.bio}"
+                            </p>
+                          )}
+
+                          {/* Skills */}
+                          {dev.skills && Array.isArray(dev.skills) && dev.skills.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {dev.skills.map((sk, sIdx) => (
+                                <span
+                                  key={sIdx}
+                                  className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 text-[10px] font-medium"
+                                >
+                                  {sk}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Social & Portfolio Links */}
+                          {(dev.github || dev.linkedin || dev.portfolio) && (
+                            <div className="flex items-center gap-3 text-[11px] pt-1">
+                              {dev.github && (
+                                <a
+                                  href={dev.github.startsWith("http") ? dev.github : `https://${dev.github}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium inline-flex items-center gap-1"
+                                >
+                                  <span>GitHub</span>
+                                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                                </a>
+                              )}
+                              {dev.linkedin && (
+                                <a
+                                  href={dev.linkedin.startsWith("http") ? dev.linkedin : `https://${dev.linkedin}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-sky-600 dark:text-sky-400 hover:underline font-medium inline-flex items-center gap-1"
+                                >
+                                  <span>LinkedIn</span>
+                                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                                </a>
+                              )}
+                              {dev.portfolio && (
+                                <a
+                                  href={dev.portfolio.startsWith("http") ? dev.portfolio : `https://${dev.portfolio}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium inline-flex items-center gap-1"
+                                >
+                                  <span>Portfolio</span>
+                                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                                </a>
+                              )}
+                            </div>
+                          )}
 
                           {/* Developer Submission Details if submitted */}
                           {resp.submission && (resp.submission.githubUrl || resp.submission.liveUrl || (resp.submission.files && resp.submission.files.length > 0)) && (

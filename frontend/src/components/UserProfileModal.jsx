@@ -77,7 +77,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, initialData = null }) => {
     completed: user.completedTasks || 0
   };
 
-  const canAssign = currentUser?.role === "admin" || currentUser?.role === "manager";
+  const canAssign = currentUser?.role === "admin" || currentUser?.role === "company" || currentUser?.role === "manager";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -241,6 +241,62 @@ const UserProfileModal = ({ isOpen, onClose, userId, initialData = null }) => {
                   )}
                 </div>
               </div>
+
+              {/* Links & Portfolio */}
+              {(user.github || user.linkedin || user.portfolio || user.companyWebsite) && (
+                <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 text-xs">
+                  <span className="text-slate-400 font-medium">Links:</span>
+                  {user.github && (
+                    <a href={user.github.startsWith("http") ? user.github : `https://${user.github}`} target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-medium">
+                      GitHub
+                    </a>
+                  )}
+                  {user.linkedin && (
+                    <a href={user.linkedin.startsWith("http") ? user.linkedin : `https://${user.linkedin}`} target="_blank" rel="noreferrer" className="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-medium">
+                      LinkedIn
+                    </a>
+                  )}
+                  {user.portfolio && (
+                    <a href={user.portfolio.startsWith("http") ? user.portfolio : `https://${user.portfolio}`} target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium">
+                      Portfolio
+                    </a>
+                  )}
+                  {user.companyWebsite && (
+                    <a href={user.companyWebsite.startsWith("http") ? user.companyWebsite : `https://${user.companyWebsite}`} target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-medium">
+                      Website
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Company Project Track Record */}
+              {user.role === "company" && user.companyStats && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Company Project Track Record
+                  </h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/60 text-center">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">Open Projects</span>
+                      <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                        {user.companyStats.openProjects}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/50 text-center">
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400">Completed</span>
+                      <p className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
+                        {user.companyStats.completedProjects}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900/50 text-center">
+                      <span className="text-[11px] text-indigo-700 dark:text-indigo-400">Active Devs</span>
+                      <p className="text-lg sm:text-xl font-bold text-indigo-700 dark:text-indigo-300 mt-0.5">
+                        {user.companyStats.activeDevelopers}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Skills (for Developer/Admin) */}
               {user.role !== "company" && (

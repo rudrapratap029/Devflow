@@ -130,8 +130,13 @@ export const uploadAttachment = async (req, res, next) => {
       project.members &&
       project.members.some((m) => m.toString() === req.user._id.toString());
     const isAdmin = req.user.role?.toLowerCase() === "admin";
+    const isAssigned =
+      task.assignedTo &&
+      (task.assignedTo._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo.toString()) === req.user._id.toString();
 
-    if (!isAdmin && !isOwner && !isMember) {
+    if (!isAdmin && !isOwner && !isMember && !isAssigned) {
       if (req.file && fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
@@ -203,8 +208,13 @@ export const getAttachments = async (req, res, next) => {
       project.members &&
       project.members.some((m) => m.toString() === req.user._id.toString());
     const isAdmin = req.user.role?.toLowerCase() === "admin";
+    const isAssigned =
+      task.assignedTo &&
+      (task.assignedTo._id
+        ? task.assignedTo._id.toString()
+        : task.assignedTo.toString()) === req.user._id.toString();
 
-    if (!isAdmin && !isOwner && !isMember) {
+    if (!isAdmin && !isOwner && !isMember && !isAssigned) {
       return res.status(403).json({
         success: false,
         message: "Access denied. You do not have access to this project"

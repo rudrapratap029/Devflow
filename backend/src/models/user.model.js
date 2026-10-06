@@ -78,6 +78,41 @@ const userSchema = new mongoose.Schema(
       enum: ["Pending", "Approved", "Rejected"],
       default: "Approved"
     },
+    location: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    companySize: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    foundedYear: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    hiringStatus: {
+      type: String,
+      trim: true,
+      default: "Actively Hiring"
+    },
+    github: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    linkedin: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    portfolio: {
+      type: String,
+      trim: true,
+      default: ""
+    },
     refreshToken: {
       type: String,
       default: null

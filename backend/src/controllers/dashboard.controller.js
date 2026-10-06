@@ -52,14 +52,53 @@ export const getOverview = async (req, res, next) => {
       totalComments = await Comment.countDocuments({ task: { $in: taskIds } });
     }
 
+    let activeProjects = 0;
+    let completedProjects = 0;
+    let applicants = 0;
+    let acceptedDevelopers = 0;
+    let pendingReviews = 0;
+
+    if (req.user.role === "company") {
+      const companyProjects = await Project.find({ owner: req.user._id });
+      totalProjects = companyProjects.length;
+      activeProjects = companyProjects.filter((p) => p.status === "Active").length;
+      completedProjects = companyProjects.filter((p) => p.status === "Completed").length;
+      pendingReviews = companyProjects.filter((p) => ["Submitted", "Under Review"].includes(p.submissionStatus)).length;
+
+      const acceptedDevSet = new Set();
+      let totalApplicants = 0;
+      companyProjects.forEach((p) => {
+        if (Array.isArray(p.developerResponses)) {
+          totalApplicants += p.developerResponses.length;
+          p.developerResponses.forEach((r) => {
+            if (r.status === "Accepted" && r.developer) {
+              acceptedDevSet.add(r.developer.toString());
+            }
+          });
+        }
+      });
+      applicants = totalApplicants;
+      acceptedDevelopers = acceptedDevSet.size;
+    }
+
+    const overviewData = {
+      totalWorkspaces,
+      totalProjects,
+      totalTasks,
+      totalComments,
+      activeProjects,
+      completedProjects,
+      applicants,
+      acceptedDevelopers,
+      pendingReviews
+    };
+
     return res.status(200).json({
       success: true,
       message: "Dashboard overview fetched successfully",
       data: {
-        totalWorkspaces,
-        totalProjects,
-        totalTasks,
-        totalComments
+        ...overviewData,
+        overview: overviewData
       }
     });
   } catch (error) {
@@ -76,7 +115,19 @@ export const getTaskStatus = async (req, res, next) => {
 
     const todo = await Task.countDocuments({ ...taskFilter, status: "Todo" });
     const inProgress = await Task.countDocuments({ ...taskFilter, status: "In Progress" });
-    const done = await Task.countDocuments({ ...taskFilter, status: "Done" });
+    const submittedForReview = await Task.countDocuments({
+      ...taskFilter,
+      status: "Submitted For Review"
+    });
+    const approved = await Task.countDocuments({ ...taskFilter, status: "Approved" });
+    const completed = await Task.countDocuments({
+      ...taskFilter,
+      status: { $in: ["Completed", "Done"] }
+    });
+    const done = await Task.countDocuments({
+      ...taskFilter,
+      status: { $in: ["Completed", "Done", "Approved"] }
+    });
 
     return res.status(200).json({
       success: true,
@@ -84,6 +135,9 @@ export const getTaskStatus = async (req, res, next) => {
       data: {
         todo,
         inProgress,
+        submittedForReview,
+        approved,
+        completed,
         done
       }
     });

@@ -8,6 +8,7 @@ import Task from "../models/task.model.js";
 import Workspace from "../models/workspace.model.js";
 import Project from "../models/project.model.js";
 import Notification from "../models/notification.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 import { emitNotification } from "../sockets/socket.js";
 
 // Uploads directory setup
@@ -222,6 +223,35 @@ export const updateProfile = async (req, res, next) => {
 
       updateData.skills = cleanSkills;
     }
+
+    // 5. Update Company Profile specific fields
+    const {
+      location,
+      companySize,
+      foundedYear,
+      hiringStatus,
+      github,
+      linkedin,
+      portfolio,
+      companyName,
+      companyWebsite,
+      companyDescription,
+      industry,
+      companyLogo
+    } = req.body || {};
+
+    if (typeof location === "string") updateData.location = location.trim();
+    if (typeof companySize === "string") updateData.companySize = companySize.trim();
+    if (typeof foundedYear === "string") updateData.foundedYear = foundedYear.trim();
+    if (typeof hiringStatus === "string") updateData.hiringStatus = hiringStatus.trim();
+    if (typeof github === "string") updateData.github = github.trim();
+    if (typeof linkedin === "string") updateData.linkedin = linkedin.trim();
+    if (typeof portfolio === "string") updateData.portfolio = portfolio.trim();
+    if (typeof companyName === "string" && companyName.trim()) updateData.companyName = companyName.trim();
+    if (typeof companyWebsite === "string") updateData.companyWebsite = companyWebsite.trim();
+    if (typeof companyDescription === "string") updateData.companyDescription = companyDescription.trim();
+    if (typeof industry === "string") updateData.industry = industry.trim();
+    if (typeof companyLogo === "string") updateData.companyLogo = companyLogo.trim();
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
@@ -438,43 +468,90 @@ export const getUserById = async (req, res, next) => {
     const userId = user._id;
 
     // Fetch user's task stats, workspaces, and projects in parallel
-    const [totalTasks, completedTasks, pendingTasks, workspaces, projects] =
+    const [totalTasks, completedTasks, pendingTasks, inProgressTasks, workspaces, projects, recentActivities] =
       await Promise.all([
         Task.countDocuments({ assignedTo: userId }),
-        Task.countDocuments({ assignedTo: userId, status: "Done" }),
         Task.countDocuments({
           assignedTo: userId,
-          status: { $in: ["Todo", "In Progress"] }
+          status: { $in: ["Done", "Completed", "Approved"] }
         }),
+        Task.countDocuments({
+          assignedTo: userId,
+          status: { $in: ["Todo", "In Progress", "Submitted For Review"] }
+        }),
+        Task.countDocuments({ assignedTo: userId, status: "In Progress" }),
         Workspace.find({
           $or: [{ owner: userId }, { members: userId }]
         }).select("name description"),
         Project.find({
           $or: [{ owner: userId }, { members: userId }]
         })
-          .select("name description status workspace")
-          .populate("workspace", "name")
+          .select("name description status workspace developerResponses owner")
+          .populate("workspace", "name"),
+        ActivityLog.find({ user: userId })
+          .populate("project", "name")
+          .populate("task", "title")
+          .sort({ createdAt: -1 })
+          .limit(6)
       ]);
+
+    // Calculate company specific metrics
+    let companyStats = null;
+    if (user.role === "company") {
+      const ownedProjects = projects.filter((p) => p.owner?.toString() === userId.toString() || p._id);
+      const openProjects = ownedProjects.filter((p) => p.status === "Active").length;
+      const completedProjCount = ownedProjects.filter((p) => p.status === "Completed").length;
+
+      const activeDevSet = new Set();
+      ownedProjects.forEach((p) => {
+        if (Array.isArray(p.developerResponses)) {
+          p.developerResponses.forEach((r) => {
+            if (r.status === "Accepted" && r.developer) {
+              activeDevSet.add(r.developer.toString());
+            }
+          });
+        }
+      });
+
+      companyStats = {
+        openProjects,
+        completedProjects: completedProjCount,
+        activeDevelopers: activeDevSet.size
+      };
+    }
 
     const pic = user.profilePicture || user.avatar || "";
     const userObj = user.toObject ? user.toObject() : { ...user };
+
+    const userPayload = {
+      ...userObj,
+      profilePicture: pic,
+      avatar: pic,
+      bio: user.bio || "",
+      skills: user.skills || [],
+      taskStats: {
+        total: totalTasks,
+        completed: completedTasks,
+        pending: pendingTasks,
+        current: inProgressTasks,
+        inProgress: inProgressTasks
+      },
+      companyStats: companyStats || {
+        openProjects: 0,
+        completedProjects: 0,
+        activeDevelopers: 0
+      },
+      recentActivities: recentActivities || [],
+      workspaces: workspaces || [],
+      projects: projects || []
+    };
 
     return res.status(200).json({
       success: true,
       message: "User profile fetched successfully",
       data: {
-        ...userObj,
-        profilePicture: pic,
-        avatar: pic,
-        bio: user.bio || "",
-        skills: user.skills || [],
-        taskStats: {
-          total: totalTasks,
-          completed: completedTasks,
-          pending: pendingTasks
-        },
-        workspaces: workspaces || [],
-        projects: projects || []
+        ...userPayload,
+        user: userPayload
       }
     });
   } catch (error) {

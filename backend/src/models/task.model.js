@@ -34,7 +34,14 @@ const taskSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Todo", "In Progress", "Done"],
+      enum: [
+        "Todo",
+        "In Progress",
+        "Submitted For Review",
+        "Approved",
+        "Completed",
+        "Done"
+      ],
       default: "Todo"
     },
     priority: {
@@ -43,6 +50,18 @@ const taskSchema = new mongoose.Schema(
       default: "Medium"
     },
     dueDate: {
+      type: Date,
+      default: null
+    },
+    submittedAt: {
+      type: Date,
+      default: null
+    },
+    approvedAt: {
+      type: Date,
+      default: null
+    },
+    completedAt: {
       type: Date,
       default: null
     }
