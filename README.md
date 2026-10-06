@@ -28,6 +28,7 @@ DevFlow is a full-stack, role-based project and task management platform designe
 * **Real-Time Client**: Socket.IO Client
 * **Code Quality**: Oxlint
 
+
 ### Backend
 * **Runtime**: Node.js (ES Modules)
 * **Framework**: Express.js
