@@ -82,3 +82,23 @@ export const emitNotification = (recipientId, notification) => {
 
   io.to(userRoom).emit("notification:new", payload);
 };
+
+// Emit real-time task update to all connected clients
+export const emitTaskUpdated = (task) => {
+  if (!io || !task) return;
+
+  const payload = {
+    _id: task._id?.toString() || task._id,
+    title: task.title,
+    status: task.status,
+    priority: task.priority,
+    project: task.project?._id || task.project || null,
+    assignedTo: task.assignedTo?._id || task.assignedTo || null,
+    submittedAt: task.submittedAt || null,
+    approvedAt: task.approvedAt || null,
+    completedAt: task.completedAt || null,
+    updatedAt: task.updatedAt || new Date().toISOString()
+  };
+
+  io.emit("task:updated", payload);
+};

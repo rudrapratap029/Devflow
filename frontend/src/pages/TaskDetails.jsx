@@ -215,7 +215,8 @@ const TaskDetails = () => {
       setStatusUpdating(true);
       const res = await API.put(`/tasks/${taskId}`, { status: newStatus });
       if (res.data?.success) {
-        setTask((prev) => ({ ...prev, status: newStatus }));
+        const updated = res.data.data?.task;
+        setTask((prev) => (updated ? { ...prev, ...updated } : { ...prev, status: newStatus }));
       }
     } catch (err) {
       alert(err.response?.data?.message || "Failed to update status");
@@ -404,10 +405,21 @@ const TaskDetails = () => {
               <label htmlFor="task-status-select" className="text-xs text-slate-500 dark:text-slate-400 font-medium">Status:</label>
               <select
                 id="task-status-select"
-                disabled={statusUpdating || !canUpdateStatus}
+                disabled={
+                  statusUpdating ||
+                  !canUpdateStatus ||
+                  (user?.role === "developer" && (task.status === "Approved" || task.status === "Completed" || task.status === "Done")) ||
+                  (user?.role === "company" && (task.status === "Todo" || task.status === "In Progress"))
+                }
                 value={task.status === "Done" ? "Completed" : task.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                title={!canUpdateStatus ? "Only the assigned developer, project owner, or admin can update status" : "Update status"}
+                title={
+                  user?.role === "company" && (task.status === "Todo" || task.status === "In Progress")
+                    ? "Company cannot change developer work status before submission"
+                    : !canUpdateStatus
+                    ? "Only the assigned developer, project owner, or admin can update status"
+                    : "Update status"
+                }
                 className="text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="Todo">Todo</option>
@@ -416,7 +428,9 @@ const TaskDetails = () => {
                 <option value="Approved" disabled={user?.role === "developer"}>
                   Approved {user?.role === "developer" ? "(Company Only)" : ""}
                 </option>
-                <option value="Completed">Completed</option>
+                <option value="Completed" disabled={user?.role === "developer"}>
+                  Completed {user?.role === "developer" ? "(Company Only)" : ""}
+                </option>
               </select>
             </div>
 
@@ -574,14 +588,15 @@ const TaskDetails = () => {
                     )}
 
                     {task.status === "Approved" && (
-                      <button
-                        type="button"
-                        disabled={statusUpdating}
-                        onClick={() => handleStatusChange("Completed")}
-                        className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        <span>Mark Completed ✓</span>
-                      </button>
+                      <div className="px-3 py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-xs font-semibold flex items-center gap-1.5">
+                        <span>✓ Work Approved by Company</span>
+                      </div>
+                    )}
+
+                    {(task.status === "Completed" || task.status === "Done") && (
+                      <div className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold flex items-center gap-1.5">
+                        <span>✓ Work Completed</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -631,19 +646,40 @@ const TaskDetails = () => {
                   )}
 
                   {task.status === "Approved" && (
-                    <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-xs text-teal-800 dark:text-teal-300 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 font-semibold">
-                        <span>✓ Work Approved by Company</span>
-                      </span>
-                      <span className="text-[11px] text-teal-600 dark:text-teal-400">
-                        Waiting for developer to mark completed
-                      </span>
+                    <div className="p-4 rounded-xl bg-teal-50/80 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-teal-600"></span>
+                          <h3 className="text-xs sm:text-sm font-bold text-teal-900 dark:text-teal-200">
+                            Work Approved
+                          </h3>
+                        </div>
+                        <p className="text-xs text-teal-700 dark:text-teal-300 mt-1">
+                          You have reviewed and approved this task. You can now finalize and mark this task as Completed.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={statusUpdating}
+                        onClick={() => handleStatusChange("Completed")}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+                        title="Mark Completed"
+                      >
+                        <span>Mark Completed ✓</span>
+                      </button>
                     </div>
                   )}
 
                   {(task.status === "Completed" || task.status === "Done") && (
-                    <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 font-semibold">
-                      <span>✓ Task Fully Completed and Verified</span>
+                    <div className="p-3.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <span>✓ Task Fully Completed</span>
+                      </span>
+                      {task.completedAt && (
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                          Finished {new Date(task.completedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

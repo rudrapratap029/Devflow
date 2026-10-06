@@ -15,16 +15,45 @@ const Notifications = () => {
     if (!n.isRead) {
       markAsRead(n._id);
     }
-    if (n.project) {
+    if (n.task) {
+      const taskId = typeof n.task === "object" ? n.task._id : n.task;
+      navigate(`/tasks/${taskId}`);
+    } else if (n.project) {
       const projId = typeof n.project === "object" ? n.project._id : n.project;
       navigate(`/projects?project=${projId}`);
-    } else if (n.task) {
-      navigate(`/task-board`);
     }
   };
 
   const getNotificationIcon = (type) => {
     switch (type) {
+      case "TASK_SUBMITTED_FOR_REVIEW":
+        return (
+          <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-200 dark:border-purple-800">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+          </div>
+        );
+      case "TASK_APPROVED":
+        return (
+          <div className="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-200 dark:border-teal-800">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        );
+      case "TASK_COMPLETED":
+        return (
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-800">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </div>
+        );
       case "NEW_PROJECT_AVAILABLE":
         return (
           <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-800">

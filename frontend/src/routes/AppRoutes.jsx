@@ -12,6 +12,7 @@ import ActivityTimeline from "../pages/ActivityTimeline";
 import Profile from "../pages/Profile";
 import Users from "../pages/Users";
 import Notifications from "../pages/Notifications";
+import ReviewTasks from "../pages/ReviewTasks";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Layout from "../components/Layout";
 
@@ -36,6 +37,7 @@ const AppRoutes = () => {
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/task-board" element={<TaskBoard />} />
+        <Route path="/review-tasks" element={<ReviewTasks />} />
         <Route path="/tasks/create" element={<CreateTask />} />
         <Route path="/tasks/:id" element={<TaskDetails />} />
         <Route path="/activity" element={<ActivityTimeline />} />

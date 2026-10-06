@@ -97,7 +97,7 @@ const TaskBoard = () => {
     try {
       setLoading(true);
       setError("");
-      const res = await API.get(`/tasks?project=${selectedProjectId}`);
+      const res = await API.get(`/tasks?project=${selectedProjectId}&limit=100`);
       if (res.data?.success) {
         setTasks(res.data.data.tasks || []);
       }
@@ -112,6 +112,46 @@ const TaskBoard = () => {
     fetchTasks();
   }, [selectedProjectId]);
 
+  // Real-time synchronization: listen for task updates and notifications
+  useEffect(() => {
+    const handleTaskUpdated = (e) => {
+      const updated = e.detail;
+      if (!updated || !updated._id) return;
+      setTasks((prev) => {
+        const index = prev.findIndex((t) => t._id === updated._id);
+        if (index !== -1) {
+          const nextTasks = [...prev];
+          nextTasks[index] = { ...nextTasks[index], ...updated };
+          return nextTasks;
+        }
+        return prev;
+      });
+    };
+
+    const handleNotification = (e) => {
+      const notif = e.detail;
+      if (notif?.task) {
+        fetchTasks();
+      }
+    };
+
+    window.addEventListener("devflow:task_updated", handleTaskUpdated);
+    window.addEventListener("devflow:notification", handleNotification);
+
+    // Periodic sync poll when tab is visible
+    const syncInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchTasks();
+      }
+    }, 8000);
+
+    return () => {
+      window.removeEventListener("devflow:task_updated", handleTaskUpdated);
+      window.removeEventListener("devflow:notification", handleNotification);
+      clearInterval(syncInterval);
+    };
+  }, [selectedProjectId]);
+
   // Handle Project Change
   const handleProjectSelect = (projectId) => {
     setSelectedProjectId(projectId);
@@ -123,8 +163,9 @@ const TaskBoard = () => {
     try {
       const res = await API.put(`/tasks/${taskId}`, { status: newStatus });
       if (res.data?.success) {
+        const updated = res.data.data?.task;
         setTasks((prev) =>
-          prev.map((t) => (t._id === taskId ? { ...t, status: newStatus } : t))
+          prev.map((t) => (t._id === taskId ? (updated ? { ...t, ...updated } : { ...t, status: newStatus }) : t))
         );
       }
     } catch (err) {
@@ -715,13 +756,9 @@ const TaskBoard = () => {
                                 )}
 
                                 {task.status === "Approved" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStatusChange(task._id, "Completed")}
-                                    className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center justify-center gap-1.5"
-                                  >
-                                    <span>Complete Work ✓</span>
-                                  </button>
+                                  <div className="text-center py-1.5 px-2 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-[11px] font-semibold flex items-center justify-center gap-1">
+                                    <span>✓ Approved by Company</span>
+                                  </div>
                                 )}
 
                                 {(task.status === "Completed" || task.status === "Done") && (
@@ -730,21 +767,26 @@ const TaskBoard = () => {
                                   </div>
                                 )}
 
-                                {/* Developer Status Selector */}
+                                {/* Developer Status Selector: restricted to Todo -> In Progress -> Submitted For Review */}
                                 <div className="flex items-center justify-between text-[11px]">
                                   <span className="text-slate-400 dark:text-slate-500 font-medium">
                                     Status:
                                   </span>
                                   <select
                                     value={task.status === "Done" ? "Completed" : task.status}
+                                    disabled={task.status === "Approved" || task.status === "Completed"}
                                     onChange={(e) => handleStatusChange(task._id, e.target.value)}
-                                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 text-slate-700 dark:text-slate-300 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 text-slate-700 dark:text-slate-300 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                                   >
                                     <option value="Todo">Todo</option>
                                     <option value="In Progress">In Progress</option>
                                     <option value="Submitted For Review">Submitted For Review</option>
-                                    <option value="Approved" disabled>Approved (Company Only)</option>
-                                    <option value="Completed">Completed</option>
+                                    {task.status === "Approved" && (
+                                      <option value="Approved" disabled>Approved</option>
+                                    )}
+                                    {(task.status === "Completed" || task.status === "Done") && (
+                                      <option value="Completed" disabled>Completed</option>
+                                    )}
                                   </select>
                                 </div>
                               </div>
@@ -754,8 +796,9 @@ const TaskBoard = () => {
                                 {task.status === "Submitted For Review" ? (
                                   <div className="p-2 rounded-lg bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 space-y-1.5">
                                     <div className="flex items-center justify-between">
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                                        Submitted Work
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
+                                        Waiting For Review
                                       </span>
                                       <Link
                                         to={`/tasks/${task._id}`}
@@ -787,8 +830,26 @@ const TaskBoard = () => {
                                     </div>
                                   </div>
                                 ) : task.status === "Approved" ? (
-                                  <div className="text-center py-1.5 px-2 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-[11px] font-semibold">
-                                    ✓ Approved by Company
+                                  <div className="p-2 rounded-lg bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60 space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300 flex items-center gap-1">
+                                        ✓ Work Approved
+                                      </span>
+                                      <Link
+                                        to={`/tasks/${task._id}`}
+                                        className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+                                      >
+                                        Details →
+                                      </Link>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStatusChange(task._id, "Completed")}
+                                      className="w-full py-1.5 px-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] shadow-2xs transition-colors flex items-center justify-center gap-1"
+                                      title="Mark completed"
+                                    >
+                                      <span>Mark Completed ✓</span>
+                                    </button>
                                   </div>
                                 ) : task.status === "Completed" || task.status === "Done" ? (
                                   <div className="text-center py-1.5 px-2 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold">

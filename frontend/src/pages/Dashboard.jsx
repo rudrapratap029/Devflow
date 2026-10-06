@@ -18,19 +18,21 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [submittedTasks, setSubmittedTasks] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        // Fetch overview, task status counts, recent activities, my tasks, and projects in parallel
-        const [overviewRes, statusRes, activitiesRes, myTasksRes, projectsRes] =
+        // Fetch overview, task status counts, recent activities, my tasks, projects, and submitted tasks
+        const [overviewRes, statusRes, activitiesRes, myTasksRes, projectsRes, submittedTasksRes] =
           await Promise.allSettled([
             API.get("/dashboard/overview"),
             API.get("/dashboard/task-status"),
             API.get("/dashboard/recent-activities"),
             API.get("/dashboard/my-tasks"),
-            API.get("/projects?limit=50")
+            API.get("/projects?limit=50"),
+            API.get("/tasks?status=Submitted For Review&limit=50")
           ]);
 
         const overview = overviewRes.status === "fulfilled" ? overviewRes.value.data?.data : {};
@@ -59,6 +61,10 @@ const Dashboard = () => {
           const projs = projectsRes.value.data?.data?.projects || projectsRes.value.data?.projects || [];
           setProjects(projs);
         }
+
+        if (submittedTasksRes.status === "fulfilled") {
+          setSubmittedTasks(submittedTasksRes.value.data?.data?.tasks || []);
+        }
       } catch (err) {
         console.error("Error loading dashboard data:", err);
       } finally {
@@ -68,6 +74,17 @@ const Dashboard = () => {
 
     fetchDashboardData();
   }, []);
+
+  const handleQuickApproveTask = async (taskId) => {
+    try {
+      const res = await API.put(`/tasks/${taskId}`, { status: "Approved" });
+      if (res.data?.success) {
+        setSubmittedTasks((prev) => prev.filter((t) => t._id !== taskId));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to approve task");
+    }
+  };
 
   // Filter project submissions
   const submittedProjects = projects.filter(
@@ -449,6 +466,96 @@ const Dashboard = () => {
       {/* ============================================================== */}
       {userRole === "company" && (
         <div className="space-y-6">
+          {/* Company: Tasks Waiting For Review */}
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 sm:p-6 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Tasks Waiting For Review</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${
+                    submittedTasks.length > 0
+                      ? "bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                  }`}>
+                    {submittedTasks.length}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Tasks completed and submitted by developers awaiting your approval
+                </p>
+              </div>
+              <Link
+                to="/review-tasks"
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium inline-flex items-center gap-1"
+              >
+                <span>View All Review Tasks</span>
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" x2="19" y1="12" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </Link>
+            </div>
+
+            {loading ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center">Loading submitted tasks...</p>
+            ) : submittedTasks.length === 0 ? (
+              <div className="text-center py-8 px-4 text-slate-400 dark:text-slate-500 text-xs sm:text-sm bg-slate-50/50 dark:bg-slate-900/30 rounded-lg border border-dashed border-slate-200 dark:border-slate-800">
+                <p className="font-semibold text-slate-700 dark:text-slate-300 text-sm">No tasks currently awaiting review</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-md mx-auto">
+                  When developers finish work and submit tasks for review, they will appear here ready for your inspection and approval.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {submittedTasks.map((t) => (
+                  <div
+                    key={t._id}
+                    className="p-3.5 rounded-xl bg-purple-50/40 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 dark:text-white text-sm">
+                          {t.title}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                          Submitted For Review
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Project: <span className="font-medium text-slate-700 dark:text-slate-300">{t.project?.name || "Project"}</span>
+                        {" • "}Developer: <span className="font-medium text-slate-700 dark:text-slate-300">{t.assignedTo?.name || "Assigned"}</span>
+                        {t.submittedAt && (
+                          <span className="ml-1 text-slate-400">
+                            • Submitted {new Date(t.submittedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Link
+                        to={`/tasks/${t._id}`}
+                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-medium transition-colors"
+                      >
+                        Inspect
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickApproveTask(t._id)}
+                        className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1"
+                        title="Approve completed work"
+                      >
+                        <span>Approve</span>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           {/* Developer Submissions & Review Queue */}
           <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 sm:p-6 shadow-xs">
             <div className="flex items-center justify-between mb-4">

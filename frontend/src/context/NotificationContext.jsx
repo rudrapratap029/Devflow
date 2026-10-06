@@ -65,16 +65,32 @@ export const NotificationProvider = ({ children }) => {
         message: newNotif.message || "New notification received",
         type: newNotif.type || "INFO"
       });
+
+      // Dispatch global window event for components to react in real-time
+      window.dispatchEvent(new CustomEvent("devflow:notification", { detail: newNotif }));
+    });
+
+    // Listen for realtime task status updates
+    socket.on("task:updated", (taskData) => {
+      window.dispatchEvent(new CustomEvent("devflow:task_updated", { detail: taskData }));
     });
 
     socket.on("connect_error", (err) => {
       console.warn("Socket connection note:", err.message);
     });
 
+    // Periodic notification polling to ensure sync
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications();
+      }
+    }, 10000);
+
     return () => {
+      clearInterval(pollInterval);
       socket.disconnect();
     };
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, fetchNotifications]);
 
   // Dismiss real-time toast
   const dismissToast = () => {

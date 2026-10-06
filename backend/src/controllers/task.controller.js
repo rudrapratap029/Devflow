@@ -5,7 +5,7 @@ import Workspace from "../models/workspace.model.js";
 import User from "../models/user.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 import Notification from "../models/notification.model.js";
-import { emitNotification } from "../sockets/socket.js";
+import { emitNotification, emitTaskUpdated } from "../sockets/socket.js";
 
 // @desc    Create a new task
 // @route   POST /api/v1/tasks
@@ -773,9 +773,9 @@ export const updateTask = async (req, res, next) => {
         }
 
         const devAllowedTransitions = {
-          "Todo": ["In Progress"],
-          "In Progress": ["Submitted For Review", "Todo"],
-          "Submitted For Review": ["Submitted For Review"], // Idempotent
+          "Todo": ["In Progress", "Todo"],
+          "In Progress": ["Submitted For Review", "Todo", "In Progress"],
+          "Submitted For Review": ["Submitted For Review"],
           "Approved": ["Approved"],
           "Completed": ["Completed"]
         };
@@ -972,7 +972,7 @@ export const updateTask = async (req, res, next) => {
             const notification = await Notification.create({
               recipient: ownerId,
               sender: req.user._id,
-              type: "TASK_STATUS_CHANGED",
+              type: "TASK_SUBMITTED_FOR_REVIEW",
               message: `${req.user.name || "Developer"} has submitted task "${task.title}" for review`,
               task: task._id,
               project: taskProjectId
@@ -982,11 +982,7 @@ export const updateTask = async (req, res, next) => {
             console.warn("Failed to notify project owner:", notifErr.message);
           }
         }
-      } else if (
-        task.status === "Approved" ||
-        task.status === "Completed" ||
-        (task.status === "In Progress" && previousStatus === "Submitted For Review")
-      ) {
+      } else if (task.status === "Approved") {
         // Send notification to developer
         const devId = task.assignedTo?._id
           ? task.assignedTo._id.toString()
@@ -996,27 +992,84 @@ export const updateTask = async (req, res, next) => {
 
         if (devId && devId !== req.user._id.toString()) {
           try {
-            let msg = `Your task "${task.title}" has been approved by ${req.user.companyName || req.user.name || "the company"}!`;
-            if (task.status === "Completed") {
-              msg = `Task "${task.title}" has been marked Completed.`;
-            } else if (task.status === "In Progress") {
-              msg = `${req.user.companyName || req.user.name || "Company"} requested revisions on task "${task.title}".`;
-            }
-
             const notification = await Notification.create({
               recipient: devId,
               sender: req.user._id,
-              type: "TASK_STATUS_CHANGED",
-              message: msg,
+              type: "TASK_APPROVED",
+              message: "Your task has been approved by company.",
               task: task._id,
               project: taskProjectId
             });
             emitNotification(devId, notification);
           } catch (notifErr) {
-            console.warn("Failed to notify developer of status change:", notifErr.message);
+            console.warn("Failed to notify developer of task approval:", notifErr.message);
+          }
+        }
+      } else if (task.status === "Completed") {
+        // 1. Send notification to developer
+        const devId = task.assignedTo?._id
+          ? task.assignedTo._id.toString()
+          : task.assignedTo
+          ? task.assignedTo.toString()
+          : null;
+
+        if (devId && devId !== req.user._id.toString()) {
+          try {
+            const devNotification = await Notification.create({
+              recipient: devId,
+              sender: req.user._id,
+              type: "TASK_COMPLETED",
+              message: "Your task has been completed.",
+              task: task._id,
+              project: taskProjectId
+            });
+            emitNotification(devId, devNotification);
+          } catch (notifErr) {
+            console.warn("Failed to notify developer of task completion:", notifErr.message);
+          }
+        }
+
+        // 2. Store completion notification for company
+        try {
+          const compNotification = await Notification.create({
+            recipient: req.user._id,
+            sender: req.user._id,
+            type: "TASK_COMPLETED",
+            message: "Task marked completed successfully.",
+            task: task._id,
+            project: taskProjectId
+          });
+          emitNotification(req.user._id, compNotification);
+        } catch (notifErr) {
+          console.warn("Failed to store company completion notification:", notifErr.message);
+        }
+      } else if (task.status === "In Progress" && previousStatus === "Submitted For Review") {
+        // Revisions requested by company
+        const devId = task.assignedTo?._id
+          ? task.assignedTo._id.toString()
+          : task.assignedTo
+          ? task.assignedTo.toString()
+          : null;
+
+        if (devId && devId !== req.user._id.toString()) {
+          try {
+            const notification = await Notification.create({
+              recipient: devId,
+              sender: req.user._id,
+              type: "TASK_STATUS_CHANGED",
+              message: `${req.user.companyName || req.user.name || "Company"} requested revisions on task "${task.title}".`,
+              task: task._id,
+              project: taskProjectId
+            });
+            emitNotification(devId, notification);
+          } catch (notifErr) {
+            console.warn("Failed to notify developer of revision request:", notifErr.message);
           }
         }
       }
+
+      // Broadcast real-time task update to all connected clients
+      emitTaskUpdated(task);
     }
 
     // Log activity: Task Updated

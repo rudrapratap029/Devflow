@@ -26,14 +26,41 @@ const NotificationDropdown = () => {
   const handleClickNotification = (n) => {
     if (!n.isRead) markAsRead(n._id);
     setIsOpen(false);
-    if (n.project) {
-      navigate(`/projects?project=${n.project}`);
-    } else if (n.task) {
-      navigate(`/tasks`);
+    if (n.task) {
+      const taskId = typeof n.task === "object" ? n.task._id : n.task;
+      navigate(`/tasks/${taskId}`);
+    } else if (n.project) {
+      const projId = typeof n.project === "object" ? n.project._id : n.project;
+      navigate(`/projects?project=${projId}`);
     }
   };
 
   const getNotificationIcon = (type) => {
+    if (type === "TASK_SUBMITTED_FOR_REVIEW") {
+      return (
+        <svg className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+      );
+    }
+    if (type === "TASK_APPROVED") {
+      return (
+        <svg className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      );
+    }
+    if (type === "TASK_COMPLETED") {
+      return (
+        <svg className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      );
+    }
     if (type === "NEW_PROJECT_AVAILABLE") {
       return (
         <svg className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
