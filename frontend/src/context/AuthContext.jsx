@@ -3,6 +3,7 @@ import API from "../services/api";
 
 const AuthContext = createContext(null);
 
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
