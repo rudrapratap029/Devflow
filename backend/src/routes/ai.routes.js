@@ -11,6 +11,7 @@ const router = Router();
 router.use(protect);
 
 // AI Assistant endpoints
+router.post("/generate-task", generateTaskSuggestion);
 router.post("/task-suggestion", generateTaskSuggestion);
 router.post("/recommend-users", recommendUsers);
 

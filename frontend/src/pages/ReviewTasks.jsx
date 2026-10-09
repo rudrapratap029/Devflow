@@ -778,14 +778,20 @@ const ReviewTasks = () => {
                     <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Completion Score:</span>
                     <span
                       className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${
-                        (verifyTask.aiReviewResult.completionScore || parseInt(verifyTask.aiReviewResult.score) || 0) >= 80
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300"
-                          : (verifyTask.aiReviewResult.completionScore || parseInt(verifyTask.aiReviewResult.score) || 0) >= 50
-                          ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300"
-                          : "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300"
+                        verifyTask.aiReviewResult.completionScore !== null &&
+                        verifyTask.aiReviewResult.completionScore !== undefined
+                          ? verifyTask.aiReviewResult.completionScore >= 80
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            : verifyTask.aiReviewResult.completionScore >= 50
+                            ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300"
+                            : "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300"
+                          : "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300"
                       }`}
                     >
-                      {verifyTask.aiReviewResult.score || `${verifyTask.aiReviewResult.completionScore}%`}
+                      {verifyTask.aiReviewResult.score ||
+                        (verifyTask.aiReviewResult.completionScore !== null && verifyTask.aiReviewResult.completionScore !== undefined
+                          ? `${verifyTask.aiReviewResult.completionScore}%`
+                          : "Insufficient submission evidence")}
                     </span>
                   </div>
 
@@ -793,6 +799,18 @@ const ReviewTasks = () => {
                     <p className="text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800 leading-relaxed">
                       {verifyTask.aiReviewResult.reviewSummary}
                     </p>
+                  )}
+
+                  {/* Code Quality & Deliverable Verification */}
+                  {verifyTask.aiReviewResult.codeQuality && (
+                    <div className="bg-white/70 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800 text-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-0.5">
+                        Code Quality & Repository Verification:
+                      </span>
+                      <p className="text-slate-700 dark:text-slate-300 text-[11px]">
+                        {verifyTask.aiReviewResult.codeQuality}
+                      </p>
+                    </div>
                   )}
 
                   {/* Match Analysis */}
@@ -811,8 +829,10 @@ const ReviewTasks = () => {
                             className={`px-1.5 py-0.2 rounded-full font-bold text-[9px] shrink-0 border ${
                               item.result === "Matched"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : item.result === "Partially Matched"
+                                : item.result === "Partially Matched" || item.result === "Partially Verified"
                                 ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : item.result === "Insufficient Evidence" || item.result === "Unverified"
+                                ? "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300"
                                 : "bg-rose-50 text-rose-700 border-rose-200"
                             }`}
                           >
@@ -832,6 +852,20 @@ const ReviewTasks = () => {
                       <ul className="list-disc list-inside text-xs text-slate-700 dark:text-slate-300 space-y-0.5">
                         {verifyTask.aiReviewResult.missingPoints.map((pt, idx) => (
                           <li key={idx}>{pt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Limitations & Scope */}
+                  {Array.isArray(verifyTask.aiReviewResult.limitations) && verifyTask.aiReviewResult.limitations.length > 0 && (
+                    <div className="p-2 rounded bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 text-[11px] space-y-0.5">
+                      <span className="font-bold text-amber-900 dark:text-amber-300 block">
+                        Assessment Limitations:
+                      </span>
+                      <ul className="list-disc list-inside space-y-0.5 text-amber-800 dark:text-amber-400">
+                        {verifyTask.aiReviewResult.limitations.map((lim, idx) => (
+                          <li key={idx}>{lim}</li>
                         ))}
                       </ul>
                     </div>

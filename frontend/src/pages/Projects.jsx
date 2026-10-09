@@ -1491,7 +1491,7 @@ const Projects = () => {
 
             {/* AI Summary Card */}
             {projectSummary && (
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/90 dark:border-slate-700/80 shadow-xs space-y-3">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/90 dark:border-slate-700/80 shadow-xs space-y-3.5">
                 <div className="flex items-center justify-between border-b border-slate-200/70 dark:border-slate-700/60 pb-2.5">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
@@ -1504,20 +1504,77 @@ const Projects = () => {
                     </h4>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Progress:</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
-                      {projectSummary.progress || "0%"}
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Completion:</span>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                      {projectSummary.progress || `${projectSummary.stats?.completionPercentage ?? 0}%`}
                     </span>
                   </div>
                 </div>
 
-                {projectSummary.summary && (
-                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                    {projectSummary.summary}
-                  </p>
+                {/* AI Error Banner if LLM failed but database stats are available */}
+                {projectSummary.aiError && (
+                  <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+                    <svg className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>{projectSummary.aiError}</span>
+                  </div>
                 )}
 
-                {/* Progress bar */}
+                {/* Authoritative Database Task Statistics Grid */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    Verified Database Task Statistics
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Total Tasks</span>
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">
+                        {projectSummary.stats?.totalTasks ?? projectSummary.totalTasks ?? 0}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-medium">Completed</span>
+                      <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                        {projectSummary.stats?.completedTasks ?? projectSummary.completedTasks ?? 0}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                      <span className="text-[10px] text-sky-600 dark:text-sky-400 block font-medium">In Progress</span>
+                      <span className="text-sm font-bold text-sky-600 dark:text-sky-400">
+                        {projectSummary.stats?.inProgressTasks ?? projectSummary.inProgressTasks ?? 0}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400 block font-medium">Under Review</span>
+                      <span className="text-sm font-bold text-purple-600 dark:text-purple-400">
+                        {projectSummary.stats?.submittedForReviewTasks ?? projectSummary.submittedForReviewTasks ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-1.5 rounded-lg bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">Pending: </span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        {projectSummary.stats?.pendingTasks ?? projectSummary.pendingTasks ?? 0}
+                      </span>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">Approved: </span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        {projectSummary.stats?.approvedTasks ?? projectSummary.approvedTasks ?? 0}
+                      </span>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                      <span className="text-[10px] text-rose-500 dark:text-rose-400 font-medium">Overdue: </span>
+                      <span className="font-bold text-rose-600 dark:text-rose-400">
+                        {projectSummary.stats?.overdueTasks ?? projectSummary.overdueTasks ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress bar strictly reflecting authoritative database completion */}
                 <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
                   <div
                     className="bg-indigo-600 dark:bg-indigo-500 h-1.5 rounded-full transition-all duration-500"
@@ -1525,11 +1582,23 @@ const Projects = () => {
                   />
                 </div>
 
+                {/* AI-Generated Progress Explanation */}
+                {projectSummary.summary && (
+                  <div className="p-3 rounded-lg bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-1">
+                      AI Progress Explanation
+                    </span>
+                    <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {projectSummary.summary}
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-3 pt-1 text-xs">
-                  {/* Delayed Tasks */}
+                  {/* Delayed / Overdue Tasks */}
                   <div>
                     <h5 className="font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider text-[11px] mb-1">
-                      Delayed Tasks:
+                      Delayed / Overdue Tasks:
                     </h5>
                     {projectSummary.delayedTasks && projectSummary.delayedTasks.length > 0 ? (
                       <ul className="space-y-1 pl-1">
@@ -1541,14 +1610,14 @@ const Projects = () => {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-slate-500 dark:text-slate-400 italic">None. All tasks are currently on track.</p>
+                      <p className="text-slate-500 dark:text-slate-400 italic">None. All active tasks are within their scheduled due dates.</p>
                     )}
                   </div>
 
-                  {/* Risks */}
+                  {/* Risks Supported by Available Data */}
                   <div>
                     <h5 className="font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider text-[11px] mb-1">
-                      Risks:
+                      Risks & Bottlenecks:
                     </h5>
                     {projectSummary.risks && projectSummary.risks.length > 0 ? (
                       <ul className="space-y-1 pl-1">
@@ -1560,14 +1629,14 @@ const Projects = () => {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-slate-500 dark:text-slate-400 italic">No critical risks identified.</p>
+                      <p className="text-slate-500 dark:text-slate-400 italic">No critical risks identified from current task data.</p>
                     )}
                   </div>
 
-                  {/* Next Priorities */}
+                  {/* Recommended Next Priorities */}
                   <div>
                     <h5 className="font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-[11px] mb-1">
-                      Next Priorities:
+                      Recommended Next Priorities:
                     </h5>
                     {projectSummary.nextPriorities && projectSummary.nextPriorities.length > 0 ? (
                       <ol className="space-y-1 pl-1 list-none">
@@ -1579,7 +1648,7 @@ const Projects = () => {
                         ))}
                       </ol>
                     ) : (
-                      <p className="text-slate-500 dark:text-slate-400 italic">Review upcoming backlog.</p>
+                      <p className="text-slate-500 dark:text-slate-400 italic">Review upcoming sprint deliverables.</p>
                     )}
                   </div>
                 </div>
@@ -1705,7 +1774,14 @@ const Projects = () => {
                     </div>
                     <div className="text-right">
                       <span className="text-[11px] text-slate-400 block">Overall Score</span>
-                      <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                      <span
+                        className={`font-bold inline-block mt-0.5 ${
+                          String(selectedProject.aiReview.overallScore).toLowerCase().includes("insufficient") ||
+                          String(selectedProject.aiReview.overallScore).toLowerCase().includes("pending")
+                            ? "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800"
+                            : "text-base text-emerald-600 dark:text-emerald-400"
+                        }`}
+                      >
                         {selectedProject.aiReview.overallScore}
                       </span>
                     </div>
@@ -1824,8 +1900,22 @@ const Projects = () => {
                     </div>
                   )}
 
+                  {/* Limitations & Scope */}
+                  {Array.isArray(selectedProject.aiReview.limitations) && selectedProject.aiReview.limitations.length > 0 && (
+                    <div className="p-3 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/60 text-xs space-y-1">
+                      <span className="font-semibold text-amber-900 dark:text-amber-300 block">
+                        Assessment Limitations & Scope:
+                      </span>
+                      <ul className="space-y-0.5 text-amber-800 dark:text-amber-400 text-[11px] list-disc list-inside">
+                        {selectedProject.aiReview.limitations.map((lim, idx) => (
+                          <li key={idx}>{lim}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   <p className="text-[11px] text-slate-400 italic pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
-                    Note: This assessment is an AI-generated analysis to assist reviewers, not an absolute evaluation.
+                    Note: This assessment is an AI-generated analysis to assist reviewers, not an absolute evaluation. The company reviewer retains final decision authority.
                   </p>
                 </div>
               )}

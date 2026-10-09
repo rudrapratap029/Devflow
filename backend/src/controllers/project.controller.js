@@ -693,7 +693,7 @@ export const removeProjectMember = async (req, res, next) => {
 
 // @desc    Generate AI summary for a selected project
 // @route   POST /api/v1/projects/:projectId/summary
-// @access  Private (Admin and Manager only)
+// @access  Private (Admin, Manager, and Company only)
 export const getProjectSummary = async (req, res, next) => {
   try {
     const projectId = req.params.projectId || req.params.id;
@@ -717,9 +717,34 @@ export const getProjectSummary = async (req, res, next) => {
       });
     }
 
-    // Fetch tasks belonging to this project
-    const tasks = await Task.find({ project: projectId })
-      .populate("assignedTo", "name email");
+    // Authorization check: Admin, Manager, Project Owner (Company), or Project Member
+    const isAdmin = req.user.role?.toLowerCase() === "admin";
+    const isManager = req.user.role?.toLowerCase() === "manager";
+    const isCompany = req.user.role?.toLowerCase() === "company";
+    const isOwner =
+      project.owner &&
+      (project.owner._id
+        ? project.owner._id.toString()
+        : project.owner.toString()) === req.user._id.toString();
+    const isMember =
+      Array.isArray(project.members) &&
+      project.members.some(
+        (m) => (m._id ? m._id.toString() : m.toString()) === req.user._id.toString()
+      );
+
+    if (!isAdmin && !isManager && (!isCompany || !isOwner) && !isMember) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You do not have permission to view this project's summary"
+      });
+    }
+
+    // Fetch tasks belonging strictly to this project without cross-project leakage
+    const taskFilter = { project: projectId };
+    if (project.workspace) {
+      taskFilter.workspace = project.workspace;
+    }
+    const tasks = await Task.find(taskFilter).populate("assignedTo", "name email");
 
     // Call AI service to generate structured summary
     const summaryData = await generateProjectSummary({ project, tasks });
@@ -1017,18 +1042,16 @@ export const reviewProjectWithAI = async (req, res, next) => {
 
     project.submissionStatus = "Under Review";
     project.aiReview = {
-      overallScore: reviewData.overallScore || "85%",
-      codeQuality: reviewData.codeQuality || "Clean modular structure with clear components",
-      requirementCoverage: reviewData.requirementCoverage || "85%",
-      missingFeatures: reviewData.missingFeatures || [],
-      strengths: reviewData.strengths || [],
-      weaknesses: reviewData.weaknesses || [],
-      suggestions: reviewData.suggestions || [],
-      improvementAreas: reviewData.improvementAreas || [
-        "Defensive input validation and error handling",
-        "Automated integration testing"
-      ],
-      recommendation: reviewData.recommendation || "Project is suitable with minor improvements.",
+      overallScore: reviewData.overallScore || "Insufficient submission evidence",
+      codeQuality: reviewData.codeQuality || "Code inspection not performed",
+      requirementCoverage: reviewData.requirementCoverage || "N/A",
+      missingFeatures: Array.isArray(reviewData.missingFeatures) ? reviewData.missingFeatures : [],
+      strengths: Array.isArray(reviewData.strengths) ? reviewData.strengths : [],
+      weaknesses: Array.isArray(reviewData.weaknesses) ? reviewData.weaknesses : [],
+      suggestions: Array.isArray(reviewData.suggestions) ? reviewData.suggestions : [],
+      improvementAreas: Array.isArray(reviewData.improvementAreas) ? reviewData.improvementAreas : [],
+      recommendation: reviewData.recommendation || "Manual review recommended.",
+      limitations: Array.isArray(reviewData.limitations) ? reviewData.limitations : [],
       analyzedAt: new Date()
     };
 

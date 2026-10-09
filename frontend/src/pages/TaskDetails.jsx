@@ -1066,20 +1066,21 @@ const TaskDetails = () => {
                   Completion Score:
                 </span>
                 <span
-                  className={`text-sm font-extrabold px-3 py-1 rounded-full border shadow-2xs ${
-                    (task.aiReviewResult.completionScore ||
-                      parseInt(task.aiReviewResult.score) ||
-                      0) >= 80
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
-                      : (task.aiReviewResult.completionScore ||
-                          parseInt(task.aiReviewResult.score) ||
-                          0) >= 50
-                      ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800"
-                      : "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800"
+                  className={`text-xs font-bold px-3 py-1 rounded-full border shadow-2xs ${
+                    task.aiReviewResult.completionScore !== null &&
+                    task.aiReviewResult.completionScore !== undefined
+                      ? task.aiReviewResult.completionScore >= 80
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
+                        : task.aiReviewResult.completionScore >= 50
+                        ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800"
+                        : "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800"
+                      : "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800"
                   }`}
                 >
                   {task.aiReviewResult.score ||
-                    `${task.aiReviewResult.completionScore}%`}
+                    (task.aiReviewResult.completionScore !== null && task.aiReviewResult.completionScore !== undefined
+                      ? `${task.aiReviewResult.completionScore}%`
+                      : "Insufficient submission evidence")}
                 </span>
               </div>
             </div>
@@ -1092,6 +1093,18 @@ const TaskDetails = () => {
                 </span>
                 <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 bg-white/70 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800 leading-relaxed">
                   {task.aiReviewResult.reviewSummary}
+                </p>
+              </div>
+            )}
+
+            {/* Code Quality Assessment */}
+            {task.aiReviewResult.codeQuality && (
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-1">
+                  Code Quality & Repository Verification
+                </span>
+                <p className="text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800">
+                  {task.aiReviewResult.codeQuality}
                 </p>
               </div>
             )}
@@ -1127,8 +1140,10 @@ const TaskDetails = () => {
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
                             item.result === "Matched"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300"
-                              : item.result === "Partially Matched"
+                              : item.result === "Partially Matched" || item.result === "Partially Verified"
                               ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300"
+                              : item.result === "Insufficient Evidence" || item.result === "Unverified"
+                              ? "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300"
                               : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300"
                           }`}
                         >
@@ -1157,8 +1172,23 @@ const TaskDetails = () => {
                 </div>
               )}
 
+            {/* Limitations & Scope */}
+            {Array.isArray(task.aiReviewResult.limitations) &&
+              task.aiReviewResult.limitations.length > 0 && (
+                <div className="p-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/50 text-xs space-y-1">
+                  <span className="font-semibold text-amber-900 dark:text-amber-300 block">
+                    Assessment Scope & Limitations:
+                  </span>
+                  <ul className="list-disc list-inside space-y-0.5 text-amber-800 dark:text-amber-400 text-[11px]">
+                    {task.aiReviewResult.limitations.map((lim, idx) => (
+                      <li key={idx}>{lim}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
             <div className="pt-2 text-[11px] text-slate-400 dark:text-slate-500 italic">
-              * Show AI result only as assistance. Company reviewer makes the final approval decision.
+              * AI review provided as assistive guidance. Company reviewer makes the final decision.
             </div>
           </div>
         )}
