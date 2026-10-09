@@ -47,7 +47,7 @@ API.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             return API(originalRequest);
           }
-        } catch (refreshErr) {
+        } catch {
           // Refresh token expired or invalid: clear storage
           localStorage.removeItem("user");
           localStorage.removeItem("accessToken");

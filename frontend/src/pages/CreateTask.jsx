@@ -9,7 +9,6 @@ const CreateTask = () => {
   const [searchParams] = useSearchParams();
   const preselectedProject = searchParams.get("project") || "";
   const preselectedAssignee = searchParams.get("assignTo") || "";
-  const preselectedAssignName = searchParams.get("assignName") || "";
 
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(preselectedProject);
@@ -20,9 +19,8 @@ const CreateTask = () => {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // AI helper states
+  // AI helper state
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState(null);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -32,9 +30,6 @@ const CreateTask = () => {
     dueDate: "",
     assignedTo: preselectedAssignee || ""
   });
-
-  const isCompanyOrAdmin =
-    user?.role === "company" || user?.role === "admin" || user?.role === "manager";
 
   // Redirect if developer tries to access company task creation
   useEffect(() => {
@@ -95,7 +90,7 @@ const CreateTask = () => {
             setFormData((prev) => ({ ...prev, assignedTo: "" }));
           }
         }
-      } catch (err) {
+      } catch {
         // Fallback: extract from active project in projects array
         const activeProj = projects.find((p) => p._id === selectedProjectId);
         if (activeProj && Array.isArray(activeProj.developerResponses)) {
@@ -123,7 +118,6 @@ const CreateTask = () => {
 
     try {
       setAiLoading(true);
-      setAiSuggestion(null);
 
       const res = await API.post("/ai/generate-task", {
         title: formData.title,
@@ -133,7 +127,6 @@ const CreateTask = () => {
 
       if (res.data?.success) {
         const data = res.data.data;
-        setAiSuggestion(data);
         if (data.description && !formData.description.trim()) {
           let enriched = data.description;
           if (data.acceptanceCriteria?.length > 0) {

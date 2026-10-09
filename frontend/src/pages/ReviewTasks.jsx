@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 
 const BACKEND_BASE_URL = (
@@ -8,7 +7,6 @@ const BACKEND_BASE_URL = (
 ).replace(/\/api\/v1\/?$/, "");
 
 const ReviewTasks = () => {
-  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("all");

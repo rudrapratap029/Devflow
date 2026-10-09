@@ -7,8 +7,6 @@ import {
 
 // @desc    Register a new user
 // @route   POST /api/v1/auth/register
-// @desc    Register a new user
-// @route   POST /api/v1/auth/register
 // @access  Public
 export const register = async (req, res, next) => {
   try {

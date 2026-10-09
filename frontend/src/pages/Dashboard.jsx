@@ -90,9 +90,6 @@ const Dashboard = () => {
   const submittedProjects = projects.filter(
     (p) => p.submissionStatus && p.submissionStatus !== "Not Submitted"
   );
-  const aiReviewedProjects = projects.filter(
-    (p) => p.aiReview && p.aiReview.overallScore != null
-  );
 
   // Company specific metrics
   const companyActiveProjects = projects.filter((p) => p.status === "Active").length;

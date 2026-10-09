@@ -107,13 +107,43 @@ const Register = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 flex flex-col justify-center items-center p-6 transition-colors">
-      {/* Top Right Theme Toggle */}
-      <div className="absolute top-5 right-5">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 transition-colors selection:bg-indigo-600 selection:text-white">
+      {/* Ambient background dot grid */}
+      <div className="absolute inset-0 bg-dot-grid opacity-70 dark:opacity-30 pointer-events-none" />
+
+      {/* Luminous floating ambient gradients */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-gradient-to-br from-indigo-500/20 via-purple-500/15 to-transparent blur-3xl pointer-events-none animate-float-slow" />
+      <div className="absolute -bottom-32 -right-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-sky-500/20 via-indigo-500/15 to-transparent blur-3xl pointer-events-none animate-pulse-glow" />
+
+      {/* Floating decorative SaaS badges (Desktop only, subtle) */}
+      <div className="hidden lg:flex items-center gap-2 absolute top-10 left-10 px-3.5 py-1.5 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300 shadow-xs animate-float">
+        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <span>Join WorkSync Platform • Transparent Work Delivery</span>
+      </div>
+
+      <div className="hidden lg:flex items-center gap-2 absolute bottom-10 left-10 px-3.5 py-1.5 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300 shadow-xs">
+        <svg className="w-3.5 h-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+        <span>Automatic Password Hashing • Bcrypt Salt 10</span>
+      </div>
+
+      {/* Top Right Theme Toggle & Return to Home */}
+      <div className="absolute top-5 right-5 flex items-center gap-2 z-20">
+        <Link
+          to="/"
+          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-[#111827]/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium transition-colors border border-slate-200/80 dark:border-slate-800 shadow-2xs backdrop-blur-sm"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          <span>Back to Home</span>
+        </Link>
         <button
           onClick={toggleTheme}
           title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
-          className="p-2 rounded-lg bg-white dark:bg-[#111827] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm transition-colors border border-slate-200/80 dark:border-slate-800 shadow-2xs"
+          className="p-2 rounded-lg bg-white/80 dark:bg-[#111827]/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm transition-colors border border-slate-200/80 dark:border-slate-800 shadow-2xs backdrop-blur-sm cursor-pointer"
           aria-label="Toggle dark mode"
         >
           {theme === "dark" ? (
@@ -136,17 +166,17 @@ const Register = () => {
         </button>
       </div>
 
-      <div className="w-full max-w-lg bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-7 sm:p-8 shadow-xs">
+      <div className="w-full max-w-lg bg-white/95 dark:bg-[#111827]/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 rounded-2xl p-7 sm:p-9 shadow-xl relative z-10 transition-all">
         <div className="text-center mb-6">
-          <Link to="/" className="inline-flex items-center gap-2.5 mb-2 group">
-            <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs">
+          <Link to="/" className="inline-flex items-center gap-2.5 mb-2.5 group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-500 flex items-center justify-center text-white font-black text-sm shadow-md group-hover:scale-105 transition-transform">
               WS
             </div>
-            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <span className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
               WorkSync
             </span>
           </Link>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
             {role === "company" ? "Company Registration" : "Developer Registration"}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -158,23 +188,27 @@ const Register = () => {
 
         {/* Role Selector Tabs */}
         <div className="mb-5">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2 text-center">
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2 text-center">
             Register As
           </label>
-          <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-900/60 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800">
             <button
               type="button"
               onClick={() => {
                 setRole("developer");
                 setError("");
               }}
-              className={`py-2 px-3 rounded-md text-xs font-semibold transition-all ${
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 role === "developer"
-                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-bold ring-1 ring-slate-200 dark:ring-slate-700"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              Developer
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              <span>Developer</span>
             </button>
             <button
               type="button"
@@ -182,13 +216,18 @@ const Register = () => {
                 setRole("company");
                 setError("");
               }}
-              className={`py-2 px-3 rounded-md text-xs font-semibold transition-all ${
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 role === "company"
-                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-bold ring-1 ring-slate-200 dark:ring-slate-700"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              Company
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect width="16" height="20" x="4" y="2" rx="2" />
+                <path d="M9 22v-4h6v4" />
+                <path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01" />
+              </svg>
+              <span>Company</span>
             </button>
           </div>
         </div>

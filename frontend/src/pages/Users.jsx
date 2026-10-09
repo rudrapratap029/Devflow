@@ -13,6 +13,9 @@ const Users = () => {
   const [error, setError] = useState("");
   const [isApiUnavailable, setIsApiUnavailable] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [verifyingId, setVerifyingId] = useState(null);
+  const [verifyMessage, setVerifyMessage] = useState("");
 
   // User Profile Explorer modal state
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -105,10 +108,6 @@ const Users = () => {
       </div>
     );
   }
-
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [verifyingId, setVerifyingId] = useState(null);
-  const [verifyMessage, setVerifyMessage] = useState("");
 
   const pendingCompaniesCount = users.filter(
     (u) => u.role === "company" && (!u.verificationStatus || u.verificationStatus === "Pending")

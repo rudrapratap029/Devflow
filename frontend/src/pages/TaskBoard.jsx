@@ -347,7 +347,7 @@ const TaskBoard = () => {
         if (res.data?.success) {
           setAcceptedUsers(res.data.data?.users || []);
         }
-      } catch (err) {
+      } catch {
         if (activeProject && Array.isArray(activeProject.developerResponses)) {
           const devs = activeProject.developerResponses
             .filter((r) => r.status === "Accepted" || r.status === "In Progress")

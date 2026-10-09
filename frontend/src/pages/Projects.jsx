@@ -133,6 +133,20 @@ const Projects = () => {
     }
   }, [projectQuery, projects]);
 
+  const fetchProjectAttachments = async (projectId) => {
+    try {
+      setAttachmentsLoading(true);
+      const res = await API.get(`/projects/${projectId}/attachments`);
+      if (res.data?.success) {
+        setProjectAttachments(res.data.data.attachments || []);
+      }
+    } catch {
+      // Ignore initial fetch errors silently
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  };
+
   // Load project resources whenever a project is selected
   useEffect(() => {
     if (selectedProject) {
@@ -166,20 +180,6 @@ const Projects = () => {
       setSummaryError("");
     }
   }, [selectedProject]);
-
-  const fetchProjectAttachments = async (projectId) => {
-    try {
-      setAttachmentsLoading(true);
-      const res = await API.get(`/projects/${projectId}/attachments`);
-      if (res.data?.success) {
-        setProjectAttachments(res.data.data.attachments || []);
-      }
-    } catch {
-      // Ignore initial fetch errors silently
-    } finally {
-      setAttachmentsLoading(false);
-    }
-  };
 
   const handleUploadResource = async (e) => {
     e.preventDefault();
@@ -2214,7 +2214,6 @@ const Projects = () => {
                   </p>
                   <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
                     {projectAttachments.map((file) => {
-                      const ext = (file.originalName || "").split(".").pop().toLowerCase();
                       const sizeFormatted = file.fileSize
                         ? file.fileSize > 1024 * 1024
                           ? `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`

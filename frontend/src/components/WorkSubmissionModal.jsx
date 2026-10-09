@@ -2,12 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import API from "../services/api";
 
 const WorkSubmissionModal = ({ isOpen, onClose, task, onSubmitted }) => {
-  if (!isOpen || !task) return null;
-
-  const [githubUrl, setGithubUrl] = useState(task.githubUrl || "");
-  const [liveUrl, setLiveUrl] = useState(task.liveUrl || "");
-  const [developerNotes, setDeveloperNotes] = useState(task.developerNotes || "");
-  const [submissionFiles, setSubmissionFiles] = useState(task.submissionFiles || []);
+  const [githubUrl, setGithubUrl] = useState(task?.githubUrl || "");
+  const [liveUrl, setLiveUrl] = useState(task?.liveUrl || "");
+  const [developerNotes, setDeveloperNotes] = useState(task?.developerNotes || "");
+  const [submissionFiles, setSubmissionFiles] = useState(task?.submissionFiles || []);
 
   useEffect(() => {
     if (task) {
@@ -166,6 +164,8 @@ const WorkSubmissionModal = ({ isOpen, onClose, task, onSubmitted }) => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
+
+  if (!isOpen || !task) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
