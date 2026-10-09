@@ -1,4 +1,5 @@
-# DevFlow - Modern Project Management & Collaboration Platform
+# WorkSync
+ - Modern Project Management & Collaboration Platform
 
 DevFlow is a full-stack, role-based project and task management platform designed to streamline workspace workflows, project tracking, real-time collaboration, and task lifecycles for agile software teams.
 
