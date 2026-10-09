@@ -9,13 +9,13 @@ import Workspace from "../models/workspace.model.js";
 import User from "../models/user.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 import Notification from "../models/notification.model.js";
-import { emitNotification, emitTaskUpdated } from "../sockets/socket.js";
+import { emitNotification, emitTaskUpdated } from "../socket/socket.js";
 import { reviewTaskSubmission } from "../services/ai.service.js";
 
 // Resolve uploads directory for work submission deliverables
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadDir = path.resolve(__dirname, "../../uploads");
+const uploadDir = path.resolve(__dirname, "../uploads");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });

@@ -5,7 +5,7 @@ import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 import Notification from "../models/notification.model.js";
-import { emitNotification } from "../sockets/socket.js";
+import { emitNotification } from "../socket/socket.js";
 import { generateProjectSummary, generateProjectReview } from "../services/ai.service.js";
 
 // @desc    Create a new project

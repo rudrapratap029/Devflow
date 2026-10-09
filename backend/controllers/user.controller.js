@@ -9,12 +9,12 @@ import Workspace from "../models/workspace.model.js";
 import Project from "../models/project.model.js";
 import Notification from "../models/notification.model.js";
 import ActivityLog from "../models/activityLog.model.js";
-import { emitNotification } from "../sockets/socket.js";
+import { emitNotification } from "../socket/socket.js";
 
 // Uploads directory setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadDir = path.resolve(__dirname, "../../uploads");
+const uploadDir = path.resolve(__dirname, "../uploads");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });

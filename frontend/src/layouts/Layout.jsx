@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
-import Navbar from "./Navbar";
-import Sidebar from "./Sidebar";
-import Toast from "./Toast";
+import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
+import Toast from "../components/Toast";
 
 const Layout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

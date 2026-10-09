@@ -14,7 +14,7 @@ import Users from "../pages/Users";
 import Notifications from "../pages/Notifications";
 import ReviewTasks from "../pages/ReviewTasks";
 import ProtectedRoute from "../components/ProtectedRoute";
-import Layout from "../components/Layout";
+import Layout from "../layouts/Layout";
 
 const AppRoutes = () => {
   return (

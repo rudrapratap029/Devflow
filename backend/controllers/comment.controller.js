@@ -3,7 +3,7 @@ import Comment from "../models/comment.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 import Notification from "../models/notification.model.js";
-import { emitNotification } from "../sockets/socket.js";
+import { emitNotification } from "../socket/socket.js";
 
 // @desc    Create a comment on a task
 // @route   POST /api/v1/tasks/:taskId/comments

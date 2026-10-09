@@ -12,7 +12,7 @@ import errorHandler from "./middleware/error.middleware.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadDir = path.resolve(__dirname, "../uploads");
+const uploadDir = path.resolve(__dirname, "uploads");
 
 const app = express();
 
