@@ -150,10 +150,10 @@ const Sidebar = ({ isOpen, onClose }) => {
           <div className="flex items-center justify-between md:hidden px-2 pt-1 pb-3 border-b border-slate-200/80 dark:border-slate-800/80">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                D
+                WS
               </div>
               <span className="text-sm font-semibold tracking-tight text-slate-900 dark:text-white">
-                DevFlow
+                WorkSync
               </span>
             </div>
             <button
@@ -175,10 +175,10 @@ const Sidebar = ({ isOpen, onClose }) => {
                 to={item.path}
                 onClick={() => onClose && onClose()}
                 className={({ isActive }) =>
-                  `flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                  `flex items-center space-x-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 relative ${
                     isActive
-                      ? "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-semibold"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/80 dark:hover:bg-slate-800/50"
+                      ? "bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-r-full before:bg-indigo-600 dark:before:bg-indigo-400"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/80 dark:hover:bg-slate-800/50 hover:translate-x-0.5"
                   }`
                 }
               >
@@ -193,7 +193,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800/80 px-2.5 flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
           <div className="flex items-center gap-1.5 truncate">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-            <span className="truncate font-medium text-slate-500 dark:text-slate-400">DevFlow Cloud</span>
+            <span className="truncate font-medium text-slate-500 dark:text-slate-400">WorkSync Cloud</span>
           </div>
           <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">v1.0</span>
         </div>

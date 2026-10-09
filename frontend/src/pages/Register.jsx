@@ -1,15 +1,25 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import API from "../services/api";
 
 const Register = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const [role, setRole] = useState("developer");
+  const urlRole = searchParams.get("role");
+  const initialRole = urlRole === "company" ? "company" : "developer";
+
+  const [role, setRole] = useState(initialRole);
+
+  useEffect(() => {
+    if (urlRole === "company" || urlRole === "developer") {
+      setRole(urlRole);
+    }
+  }, [urlRole]);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -130,10 +140,10 @@ const Register = () => {
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2.5 mb-2 group">
             <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs">
-              D
+              WS
             </div>
             <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              DevFlow
+              WorkSync
             </span>
           </Link>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-1">

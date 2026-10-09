@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import API from "../services/api";
@@ -7,18 +7,29 @@ import API from "../services/api";
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { login, isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
+
+  const urlRole = searchParams.get("role");
+  const validRole = ["admin", "company", "developer"].includes(urlRole) ? urlRole : "developer";
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    role: "developer"
+    role: validRole
   });
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState(
     location.state?.message || ""
   );
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (urlRole && ["admin", "company", "developer"].includes(urlRole)) {
+      setFormData((prev) => ({ ...prev, role: urlRole }));
+    }
+  }, [urlRole]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -84,10 +95,10 @@ const Login = () => {
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2.5 mb-2 group">
             <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs">
-              D
+              WS
             </div>
             <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              DevFlow
+              WorkSync
             </span>
           </Link>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-1">

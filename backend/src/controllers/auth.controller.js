@@ -67,9 +67,17 @@ export const register = async (req, res, next) => {
       });
     }
 
-    // Validate role if provided
-    const validRoles = ["admin", "company", "developer", "manager"];
-    const userRole = role && validRoles.includes(role.toLowerCase())
+    // Security: Block public registration of administrator and manager accounts
+    if (role && (role.toLowerCase() === "admin" || role.toLowerCase() === "manager")) {
+      return res.status(403).json({
+        success: false,
+        message: "Administrator accounts cannot be created through public registration. Please contact the system administrator."
+      });
+    }
+
+    // Public signup is strictly restricted to company or developer
+    const validPublicRoles = ["company", "developer"];
+    const userRole = role && validPublicRoles.includes(role.toLowerCase())
       ? role.toLowerCase()
       : "developer";
 

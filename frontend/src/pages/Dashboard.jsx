@@ -118,8 +118,44 @@ const Dashboard = () => {
     (p) => ["Submitted", "Under Review"].includes(p.submissionStatus)
   ).length;
 
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6 animate-pulse">
+        {/* Banner Skeleton */}
+        <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 sm:p-7 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="h-5 w-32 bg-slate-200 dark:bg-slate-800 rounded-md" />
+            <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
+          </div>
+          <div className="h-8 w-64 bg-slate-200 dark:bg-slate-800 rounded-md mt-4" />
+          <div className="h-4 w-96 max-w-full bg-slate-200 dark:bg-slate-800 rounded-md mt-2" />
+        </div>
+
+        {/* Metric Cards Skeleton Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs h-28 flex flex-col justify-between"
+            >
+              <div className="h-3 w-16 bg-slate-200 dark:bg-slate-800 rounded" />
+              <div className="h-7 w-12 bg-slate-200 dark:bg-slate-800 rounded" />
+              <div className="h-3 w-20 bg-slate-200 dark:bg-slate-800 rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Content Skeleton Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 h-72" />
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 h-72" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
       {/* ============================================================== */}
       {/* 1. WELCOME BANNER (ROLE-TAILORED) */}
       {/* ============================================================== */}
@@ -157,7 +193,7 @@ const Dashboard = () => {
             user?.verificationStatus === "Approved" ? (
               <Link
                 to="/projects"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium shadow-xs shrink-0 transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium shadow-xs shrink-0 transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19" />
@@ -183,13 +219,13 @@ const Dashboard = () => {
             <div className="flex items-center gap-2 shrink-0">
               <Link
                 to="/users"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0"
               >
                 <span>Manage & Verify Companies</span>
               </Link>
               <Link
                 to="/projects"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-xs transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-xs transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0"
               >
                 <span>All Projects</span>
               </Link>
@@ -271,7 +307,7 @@ const Dashboard = () => {
       {userRole === "company" ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           {/* 1. Total Projects */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-500/30 transition-all duration-200 cursor-default group">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Total Projects
             </span>
@@ -284,7 +320,7 @@ const Dashboard = () => {
           </div>
 
           {/* 2. Active Projects */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-500/30 transition-all duration-200 cursor-default group">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Active Projects
             </span>
@@ -298,7 +334,7 @@ const Dashboard = () => {
           </div>
 
           {/* 3. Completed Projects */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-500/30 transition-all duration-200 cursor-default group">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Completed
             </span>
@@ -312,7 +348,7 @@ const Dashboard = () => {
           </div>
 
           {/* 4. Applicants */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-500/30 transition-all duration-200 cursor-default group">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Applicants
             </span>
@@ -325,7 +361,7 @@ const Dashboard = () => {
           </div>
 
           {/* 5. Accepted Developers */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-500/30 transition-all duration-200 cursor-default group">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Accepted Devs
             </span>
@@ -338,7 +374,7 @@ const Dashboard = () => {
           </div>
 
           {/* 6. Pending Reviews */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-500/30 transition-all duration-200 cursor-default group">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Pending Reviews
             </span>
@@ -355,7 +391,7 @@ const Dashboard = () => {
         /* Developer / Admin default cards */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total Projects */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 shadow-xs hover:border-indigo-500/30 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {userRole === "admin" ? "Total Projects" : "Assigned Projects"}
@@ -382,7 +418,7 @@ const Dashboard = () => {
           </div>
 
           {/* Total Tasks / Pending */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 shadow-xs hover:border-indigo-500/30 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {userRole === "admin" ? "Total Tasks" : "Pending Tasks"}
@@ -412,7 +448,7 @@ const Dashboard = () => {
           </div>
 
           {/* Completed Tasks */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 shadow-xs hover:border-indigo-500/30 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Completed Tasks
@@ -434,7 +470,7 @@ const Dashboard = () => {
           </div>
 
           {/* Submissions / Workspaces */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 shadow-xs hover:border-indigo-500/30 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {userRole === "admin" ? "Workspaces" : "Project Submissions"}
@@ -535,14 +571,14 @@ const Dashboard = () => {
                     <div className="flex items-center gap-2 shrink-0">
                       <Link
                         to={`/tasks/${t._id}`}
-                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-medium transition-colors"
+                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-medium transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0"
                       >
                         Inspect
                       </Link>
                       <button
                         type="button"
                         onClick={() => handleQuickApproveTask(t._id)}
-                        className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs transition-colors shadow-2xs flex items-center gap-1"
+                        className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 shadow-2xs flex items-center gap-1 cursor-pointer"
                         title="Approve completed work"
                       >
                         <span>Approve</span>
