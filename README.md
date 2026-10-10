@@ -1,207 +1,361 @@
-# WorkSync
- - Modern Project Management & Collaboration Platform
+# WorkSync 🚀
 
-DevFlow is a full-stack, role-based project and task management platform designed to streamline workspace workflows, project tracking, real-time collaboration, and task lifecycles for agile software teams.
+### Team Collaboration & Project Management Platform
 
----
+WorkSync is a full-stack project management platform designed to help teams organize their work, manage projects, assign tasks, and collaborate efficiently from a single place.
 
-##  Key Features
+The platform provides a Trello/Jira-like workflow where users can create workspaces, manage projects, assign tasks, track progress, communicate through comments, and get real-time updates.
 
-* **Role-Based Access Control (RBAC)**:
-  * **Admin**: Complete workspace administration, user management, project creation/deletion, and resource oversight.
-  * **Manager**: Create and manage projects within assigned workspaces, create and assign tasks to members.
-  * **Developer**: View assigned workspaces, projects, and tasks; update own task progress, post comments, and upload file attachments.
-* **Workspace & Project Organization**: Multi-tenant workspace hierarchies with scoped project memberships.
-* **Kanban Task Board**: Visual task tracking across `Todo`, `In Progress`, and `Done` states with priority tags (`Low`, `Medium`, `High`) and member assignments.
-* **Task Details & Activity**: Discussion threads with comments, file attachments (PDF, DOCX, PNG, JPG), and project activity audit logs.
-* **Real-Time Notifications**: Integrated Socket.IO notifications for task assignments and status updates.
-* **JWT Authentication**: Secure authentication with short-lived access tokens and refresh tokens.
+The main goal of this project was to build a practical industry-style application with authentication, role-based access control, task management, collaboration features, and modern full-stack development practices.
 
 ---
 
-##  Tech Stack
+## 🌐 Live Demo
 
-### Frontend
-* **Framework**: React 19 + Vite
-* **Styling**: Tailwind CSS
-* **Routing**: React Router v7
-* **State & Networking**: React Context API, Axios (with auth interceptors)
-* **Real-Time Client**: Socket.IO Client
-* **Code Quality**: Oxlint
+**Frontend:**
+https://work-sync-sage.vercel.app
 
-
-### Backend
-* **Runtime**: Node.js (ES Modules)
-* **Framework**: Express.js
-* **Database**: MongoDB with Mongoose ODM
-* **Authentication**: JSON Web Tokens (JWT), Bcrypt password hashing
-* **File Handling**: Multer with file type & size validation
-* **WebSockets**: Socket.IO
-* **Security & Utilities**: Helmet, CORS, Cookie-Parser, Morgan
+**Backend API:**
+https://worksync-1-bx95.onrender.com
 
 ---
 
-## 📁 Project Structure
+# ✨ Features
 
-```text
-DevFlow/
-│
-├── frontend/                   # Frontend React + Vite Application
-│   ├── public/                 # Static assets & icons
-│   ├── src/
-│   │   ├── assets/             # Brand logos & imagery
-│   │   ├── components/         # Reusable UI components (Navbar, Sidebar, Layout, Toast, etc.)
-│   │   ├── context/            # AuthContext, NotificationContext, ThemeContext
-│   │   ├── pages/              # Views (Dashboard, Workspaces, Projects, TaskBoard, Users, etc.)
-│   │   ├── routes/             # App routing & ProtectedRoute
-│   │   ├── services/           # Axios HTTP client configuration
-│   │   ├── App.jsx             # Root React component
-│   │   ├── main.jsx            # React entry point
-│   │   └── index.css           # Global Tailwind CSS styles
-│   ├── .env.example            # Frontend environment template
-│   ├── package.json            # Frontend dependencies & scripts
-│   ├── tailwind.config.js      # Tailwind CSS configuration
-│   └── vite.config.js          # Vite build tool configuration
-│
-├── backend/                    # Backend Node.js / Express API
-│   ├── src/
-│   │   ├── config/             # MongoDB database connection
-│   │   ├── controllers/        # Request handlers (auth, workspace, project, task, user, etc.)
-│   │   ├── middleware/         # Auth, RBAC authorize, error handling, notFound
-│   │   ├── models/             # Mongoose schemas (User, Workspace, Project, Task, Comment, etc.)
-│   │   ├── routes/             # Express API route modules
-│   │   ├── services/           # Email service helper
-│   │   ├── sockets/            # Socket.IO connection & notification events
-│   │   ├── utils/              # Token generation utilities
-│   │   └── app.js              # Express app initialization
-│   ├── uploads/                # Local attachment storage
-│   ├── .env.example            # Backend environment template
-│   ├── package.json            # Backend dependencies & scripts
-│   └── server.js               # HTTP & Socket.IO server entry point
-│
-├── .gitignore                  # Git ignore rules for root, backend, and frontend
-├── .env.example                # Combined environment variables reference
-├── README.md                   # Project documentation
-└── package.json                # Root package runner & developer scripts
+## 🔐 Authentication & Authorization
+
+* User registration and login
+* JWT based authentication
+* Access token and refresh token handling
+* Secure password hashing using bcrypt
+* Protected routes
+* Role-based access control
+
+### User Roles:
+
+* **Admin**
+
+  * Manage users
+  * Manage workspaces and projects
+  * Assign tasks
+
+* **Manager**
+
+  * Manage projects
+  * Assign and track tasks
+  * Collaborate with team members
+
+* **Developer**
+
+  * View assigned tasks
+  * Update task progress
+  * Add comments and attachments
+
+---
+
+# 📌 Workspace Management
+
+* Create and manage workspaces
+* Add/remove workspace members
+* Control workspace access
+* Organize multiple projects under a workspace
+
+---
+
+# 📂 Project Management
+
+* Create projects
+* Add team members
+* Manage project details
+* Track project progress
+* Project based task organization
+
+---
+
+# ✅ Task Management
+
+WorkSync provides a complete task workflow:
+
+* Create tasks
+* Assign tasks to team members
+* Update task status
+
+Task Status:
+
+* Todo
+* In Progress
+* Done
+
+Task Priority:
+
+* Low
+* Medium
+* High
+
+Additional features:
+
+* Due date management
+* Task filtering
+* Search functionality
+* Pagination support
+
+---
+
+# 💬 Collaboration Features
+
+## Comments
+
+Users can:
+
+* Add comments on tasks
+* Edit comments
+* Delete comments
+
+## Attachments
+
+Supported file uploads:
+
+* Images
+* PDF
+* DOCX
+
+Features:
+
+* Upload task related files
+* View attachments
+* Delete attachments
+
+---
+
+# 🔔 Notifications
+
+Users receive notifications for:
+
+* Task assignment
+* New comments
+* Task status updates
+
+Additional functionality:
+
+* Mark individual notifications as read
+* Mark all notifications as read
+
+---
+
+# 📊 Dashboard & Analytics
+
+Dashboard provides project insights:
+
+* Total projects
+* Total tasks
+* Task status overview
+* Recent activities
+* Productivity tracking
+
+---
+
+# 🤖 AI Task Assistant
+
+WorkSync includes AI-powered assistance to improve task planning.
+
+AI can help with:
+
+* Task description suggestions
+* Acceptance criteria generation
+* Sub-task suggestions
+* Estimated time suggestions
+
+---
+
+# 🏗️ System Architecture
+
+```
+                User
+                 |
+                 |
+          React Frontend
+                 |
+              Axios API
+                 |
+                 |
+        Node.js + Express Backend
+                 |
+                 |
+            MongoDB Database
 ```
 
 ---
 
-## Installation & Setup
+# 🛠️ Tech Stack
 
-### Prerequisites
-* **Node.js**: v18 or higher (v20+ recommended)
-* **MongoDB**: Local MongoDB instance or MongoDB Atlas connection string
-* **Git**: Installed on your system
+## Frontend
 
-### 1. Clone Repository & Install Dependencies
+* React.js
+* Vite
+* Tailwind CSS
+* React Router
+* Axios
+* Context API
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd Devflow
+## Backend
 
-# Install all dependencies across backend and frontend
-npm run install:all
+* Node.js
+* Express.js
+* MongoDB
+* Mongoose
+* JWT Authentication
+* bcrypt
+* Multer
+* Socket.IO
+
+## Deployment
+
+Frontend:
+
+* Vercel
+
+Backend:
+
+* Render
+
+Database:
+
+* MongoDB Atlas
+
+---
+
+# 📁 Project Structure
+
+```
+WorkSync
+│
+├── backend
+│   ├── controllers
+│   ├── models
+│   ├── routes
+│   ├── middleware
+│   ├── uploads
+│   └── server.js
+│
+├── frontend
+│   ├── src
+│   │   ├── components
+│   │   ├── pages
+│   │   ├── context
+│   │   ├── services
+│   │   └── App.jsx
+│   │
+│   └── package.json
+│
+└── README.md
 ```
 
-Alternatively, install individually:
+---
+
+# ⚙️ Local Setup
+
+## Clone Repository
+
 ```bash
-# Backend dependencies
+git clone https://github.com/rudrapratap029/WorkSync.git
+
+cd WorkSync
+```
+
+---
+
+# Backend Setup
+
+```bash
 cd backend
-npm install
 
-# Frontend dependencies
-cd ../frontend
 npm install
 ```
 
----
+Create `.env` file:
 
-## 🔐 Environment Configuration
-
-### Backend Setup (`backend/.env`)
-Copy `backend/.env.example` to `backend/.env` and update your values:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-Required variables:
 ```env
 PORT=5000
-NODE_ENV=development
-MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/devflow?retryWrites=true&w=majority
 
-ACCESS_TOKEN_SECRET=your_jwt_access_secret_key_minimum_32_characters_long
-JWT_SECRET=your_jwt_access_secret_key_minimum_32_characters_long
-JWT_EXPIRES_IN=15m
+MONGODB_URI=your_mongodb_connection_string
 
-REFRESH_TOKEN_SECRET=your_jwt_refresh_secret_key_minimum_32_characters_long
-JWT_REFRESH_SECRET=your_jwt_refresh_secret_key_minimum_32_characters_long
-JWT_REFRESH_EXPIRES_IN=7d
-COOKIE_EXPIRES_IN=7
+JWT_SECRET=your_secret
+
+JWT_REFRESH_SECRET=your_refresh_secret
+
+GROQ_API_KEY=your_api_key
 ```
 
-### Frontend Setup (`frontend/.env`)
-Copy `frontend/.env.example` to `frontend/.env`:
+Run backend:
 
 ```bash
-cp frontend/.env.example frontend/.env
+node server.js
 ```
 
-Required variable:
-```env
-VITE_API_URL=http://localhost:5000/api/v1
+Backend will start on:
+
+```
+http://localhost:5000
 ```
 
 ---
 
-## 🏃 Running the Application
+# Frontend Setup
 
-### Option A: From the Root Directory
-
-```bash
-# Start backend development server (Port 5000)
-npm run dev:backend
-
-# In a separate terminal, start frontend development server (Port 5173 / 5174)
-npm run dev:frontend
-```
-
-### Option B: Running Directly in Each Directory
+Open another terminal:
 
 ```bash
-# Terminal 1 - Backend
-cd backend
-npm run dev
-
-# Terminal 2 - Frontend
 cd frontend
+
+npm install
+
 npm run dev
 ```
 
-The frontend will be accessible at: `http://localhost:5173` (or `http://localhost:5174`).  
-The backend API is accessible at: `http://localhost:5000/api/v1`.
+Frontend will start on:
 
----
-
-##  Building & Verification
-
-```bash
-# Run production build on frontend
-npm run build:frontend
-
-# Run linter on frontend
-npm run lint:frontend
+```
+http://localhost:5173
 ```
 
 ---
 
-##  License
+# 🔒 Security Implemented
 
-This project is licensed under the MIT License.
+* JWT authentication
+* Password encryption
+* Protected API routes
+* Role based permissions
+* Input validation
+* Secure environment variables
 
-##
+---
 
-Developed By Rudra Pratap Singh
+# 📈 Future Improvements
+
+Some planned improvements:
+
+* Advanced analytics dashboard
+* Email notifications
+* Calendar integration
+* More AI based project insights
+* Mobile application
+* Improved team communication features
+
+---
+
+# 👨‍💻 Developer
+
+**Rudra Pratap Singh**
+
+B.Tech Computer Science Engineering
+
+GitHub:
+https://github.com/rudrapratap029
+
+LinkedIn:
+https://www.linkedin.com/in/rudra-pratap-singh-52bab1288/
+
+---
+
+## ⭐ If you like this project, consider giving it a star!
